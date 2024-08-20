@@ -46,6 +46,13 @@ struct Args {
     ignore: bool,
 
     #[arg(
+        short = 'e',
+        long,
+        help = "Cause environment variables to override macro assignments within makefiles"
+    )]
+    env_macros: bool,
+
+    #[arg(
         short = 'n',
         long,
         help = "Print commands to stdout and do not execute them"
@@ -73,6 +80,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let Args {
         directory,
         makefile,
+        env_macros,
         ignore,
         dry_run,
         silent,
@@ -96,6 +104,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         dry_run,
         silent,
         touch,
+        env_macros
     };
 
     let make = Make::try_from((parsed, config)).unwrap_or_else(|err| {
@@ -103,6 +112,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         process::exit(err.into());
     });
 
+        
     if targets.is_empty() {
         let target = make
             .first_target()

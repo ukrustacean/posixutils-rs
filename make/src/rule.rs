@@ -70,6 +70,7 @@ impl Rule {
             dry_run: global_dry_run,
             silent: global_silent,
             touch: global_touch,
+            env_macros: global_env_macros,
         } = *global_config;
         let Config {
             ignore: rule_ignore,
@@ -88,6 +89,7 @@ impl Rule {
             let silent = global_silent || rule_silent || recipe_silent;
             let force_run = recipe_force_run;
             let touch = global_touch;
+            let env_macros = global_env_macros;
 
             if !force_run {
                 // -n flag
@@ -113,7 +115,9 @@ impl Rule {
                     .map(|s| s.as_str())
                     .unwrap_or(DEFAULT_SHELL),
             );
-            self.init_env(&mut command, macros);
+
+            self.init_env(env_macros, &mut command, macros);
+
             command.args(["-c", recipe.as_ref()]);
 
             let status = match command.status() {
@@ -151,13 +155,31 @@ impl Rule {
     }
 
     /// A helper function to initialize env vars for shell commands.
-    fn init_env(&self, command: &mut Command, variables: &[VariableDefinition]) {
-        command.envs(variables.iter().map(|v| {
-            (
-                v.name().unwrap_or_default(),
-                v.raw_value().unwrap_or_default(),
-            )
-        }));
+    fn init_env(&self, env_macros: bool, command: &mut Command, variables: &[VariableDefinition]) {
+        let mut macros: Vec<(String, String)> = variables
+            .iter()
+            .map(|v| {
+                (
+                    v.name().unwrap_or_default(),
+                    v.raw_value().unwrap_or_default(),
+                )
+            })
+            .collect();
+
+        if env_macros {
+            // Retrieve environment variables from the system
+            let env_vars: Vec<(String, String)> = std::env::vars().collect();
+
+            // Filter and replace variables if they exist in the system environment
+            for (key, value) in env_vars {
+                // Remove any existing entry with the same key
+                macros.retain(|(k, _)| k != &key);
+                // Add the new environment variable
+                macros.push((key, value));
+            }
+        }
+
+        command.envs(macros);
     }
 }
 

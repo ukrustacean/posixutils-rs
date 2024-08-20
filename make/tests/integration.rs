@@ -199,6 +199,27 @@ mod macros {
             0,
         );
     }
+
+    #[test]
+    fn envs_in_recipes() {
+        let output = std::process::Command::new("make")
+            .env("MACRO", "echo")
+            .arg("-ef")
+            .arg("tests/makefiles/macros/envs_in_recipes.mk")
+            .output()
+            .unwrap();
+
+        assert_eq!(
+            output.status.code().unwrap(),
+            0,
+            "Command did not exit with status 0"
+        );
+
+        assert_eq!(
+            String::from_utf8_lossy(&output.stdout),
+            "echo \"macro is replaced succesfully\"\nmacro is replaced succesfully\n"
+        )
+    }
 }
 
 mod target_behavior {
