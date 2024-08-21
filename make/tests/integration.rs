@@ -133,6 +133,16 @@ mod arguments {
             remove_touches,
         )
     }
+
+    #[test]
+    fn dash_q() {
+        run_test_helper(
+            &["-qf", "tests/makefiles/arguments/dash_q/cc_target.mk"],
+            "",
+            "",
+            1,
+        );
+    }
 }
 
 // such tests should be moved directly to the package responsible for parsing makefiles
@@ -188,6 +198,8 @@ mod io {
 }
 
 mod macros {
+    use std::env;
+
     use super::*;
 
     #[test]
@@ -202,23 +214,22 @@ mod macros {
 
     #[test]
     fn envs_in_recipes() {
-        let output = std::process::Command::new("make")
-            .env("MACRO", "echo")
-            .arg("-ef")
-            .arg("tests/makefiles/macros/envs_in_recipes.mk")
-            .output()
-            .unwrap();
-
-        assert_eq!(
-            output.status.code().unwrap(),
+        run_test_helper_with_setup_and_destruct(
+            &["-esf", "tests/makefiles/macros/envs_in_recipes.mk"],
+            "macro is replaced succesfully\n",
+            "",
             0,
-            "Command did not exit with status 0"
+            set_env_vars,
+            clean_env_vars,
         );
 
-        assert_eq!(
-            String::from_utf8_lossy(&output.stdout),
-            "echo \"macro is replaced succesfully\"\nmacro is replaced succesfully\n"
-        )
+        fn set_env_vars() {
+            env::set_var("MACRO", "echo");
+        }
+
+        fn clean_env_vars() {
+            env::remove_var("MACRO");
+        }
     }
 }
 
@@ -272,7 +283,7 @@ mod target_behavior {
     fn diamond_chaining_with_touches() {
         let remove_touches = || {
             let dir = "tests/makefiles/target_behavior/diamond_chaining_with_touches";
-            for i in 1..=4 {
+            for i in 1..=5 {
                 let _ = fs::remove_file(format!("{}/rule{}", dir, i));
             }
         };
@@ -367,6 +378,18 @@ mod recipes {
                     0,
                     remove_touches,
                     remove_touches,
+                );
+            }
+            #[test]
+            fn with_dash_q() {
+                run_test_helper(
+                    &[
+                        "-sqf",
+                        "tests/makefiles/recipes/prefixes/force_run/with_dry_run.mk",
+                    ],
+                    "I am NOT skipped\n",
+                    "",
+                    0,
                 );
             }
         }

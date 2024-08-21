@@ -13,11 +13,12 @@ use std::{
     ffi::OsString,
     fs,
     io::{self, Read},
+    os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
     process,
 };
 
-use clap::Parser;
+use clap::{builder::PathBufValueParser, Parser};
 use const_format::formatcp;
 use gettextrs::{bind_textdomain_codeset, textdomain};
 use makefile_lossless::Makefile;
@@ -34,6 +35,7 @@ const MAKEFILE_PATH: [&str; 2] = [
     formatcp!("./{}", MAKEFILE_NAME[1]),
 ];
 
+// todo: sort arguments
 #[derive(Parser, Debug)]
 struct Args {
     #[arg(short = 'C', long, help = "Change to DIRECTORY before doing anything")]
@@ -63,6 +65,19 @@ struct Args {
     silent: bool,
 
     #[arg(
+        short = 'q',
+        long,
+        help = "Return a zero exit value if the target file is up-to-date; otherwise, return an exit value of 1."
+    )]
+    quit: bool,
+
+    // #[arg(
+    //     short = 'p',
+    //     long,
+    //     help = "Write to standard output the complete set of macro definitions and target descriptions"
+    // )]
+    // print: bool,
+    #[arg(
         short = 't',
         long,
         help = "If makefile should touch targets on execution"
@@ -81,9 +96,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         directory,
         makefile,
         env_macros,
+        // print,
         ignore,
         dry_run,
         silent,
+        quit,
         touch,
         mut targets,
     } = Args::parse();
@@ -99,12 +116,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         eprintln!("make: {}", err);
         process::exit(err.into());
     });
+
     let config = Config {
         ignore,
         dry_run,
         silent,
         touch,
-        env_macros
+        env_macros,
+        quit,
     };
 
     let make = Make::try_from((parsed, config)).unwrap_or_else(|err| {
@@ -112,7 +131,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         process::exit(err.into());
     });
 
-        
     if targets.is_empty() {
         let target = make
             .first_target()

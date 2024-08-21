@@ -20,6 +20,8 @@ pub struct Config {
     pub touch: bool,
     /// Whether to replace macros within makefiles with envs
     pub env_macros: bool,
+    /// Whether to quit without build
+    pub quit: bool,
 }
 
 #[allow(clippy::derivable_impls)]
@@ -31,6 +33,7 @@ impl Default for Config {
             silent: false,
             touch: false,
             env_macros: false,
+            quit: false
         }
     }
 }

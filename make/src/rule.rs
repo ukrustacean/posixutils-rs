@@ -13,16 +13,17 @@ pub mod recipe;
 pub mod target;
 
 use std::{
+    collections::HashMap,
     env,
     fs::{File, FileTimes},
-    process::Command,
+    process::{self, Command},
     time::SystemTime,
 };
 
 use crate::{
     config::Config as GlobalConfig,
     error_code::ErrorCode::{self, *},
-    DEFAULT_SHELL, DEFAULT_SHELL_VAR,
+    get_modified_time, DEFAULT_SHELL, DEFAULT_SHELL_VAR,
 };
 use config::Config;
 use makefile_lossless::{Rule as ParsedRule, VariableDefinition};
@@ -64,6 +65,7 @@ impl Rule {
         global_config: &GlobalConfig,
         macros: &[VariableDefinition],
         target: &Target,
+        up_to_date: bool,
     ) -> Result<(), ErrorCode> {
         let GlobalConfig {
             ignore: global_ignore,
@@ -71,6 +73,7 @@ impl Rule {
             silent: global_silent,
             touch: global_touch,
             env_macros: global_env_macros,
+            quit: global_quit,
         } = *global_config;
         let Config {
             ignore: rule_ignore,
@@ -90,6 +93,7 @@ impl Rule {
             let force_run = recipe_force_run;
             let touch = global_touch;
             let env_macros = global_env_macros;
+            let quit = global_quit;
 
             if !force_run {
                 // -n flag
@@ -101,6 +105,14 @@ impl Rule {
                 // -t flag
                 if touch {
                     continue;
+                }
+                // -q flag
+                if quit {
+                    if up_to_date {
+                        process::exit(0);
+                    } else {
+                        process::exit(1);
+                    }
                 }
             }
 
@@ -156,7 +168,7 @@ impl Rule {
 
     /// A helper function to initialize env vars for shell commands.
     fn init_env(&self, env_macros: bool, command: &mut Command, variables: &[VariableDefinition]) {
-        let mut macros: Vec<(String, String)> = variables
+        let mut macros: HashMap<String, String> = variables
             .iter()
             .map(|v| {
                 (
@@ -167,18 +179,9 @@ impl Rule {
             .collect();
 
         if env_macros {
-            // Retrieve environment variables from the system
-            let env_vars: Vec<(String, String)> = std::env::vars().collect();
-
-            // Filter and replace variables if they exist in the system environment
-            for (key, value) in env_vars {
-                // Remove any existing entry with the same key
-                macros.retain(|(k, _)| k != &key);
-                // Add the new environment variable
-                macros.push((key, value));
-            }
+            let env_vars: HashMap<String, String> = std::env::vars().collect();
+            macros.extend(env_vars);
         }
-
         command.envs(macros);
     }
 }

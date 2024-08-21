@@ -12,7 +12,7 @@ pub mod error_code;
 pub mod rule;
 pub mod special_target;
 
-use std::{collections::HashSet, fs, time::SystemTime};
+use std::{collections::HashSet, fs, process, time::SystemTime};
 
 use makefile_lossless::{Makefile, VariableDefinition};
 
@@ -93,15 +93,15 @@ impl Make {
         }
 
         let newer_prerequisites = self.get_newer_prerequisites(target);
-        if newer_prerequisites.is_empty() && get_modified_time(target).is_some() {
+        let up_to_date = newer_prerequisites.is_empty() && get_modified_time(target).is_some();
+        if up_to_date {
             return Ok(false);
         }
 
-        for prerequisite in newer_prerequisites {
-            self.build_target(prerequisite)?;
+        for prerequisite in &newer_prerequisites {
+            self.build_target(&prerequisite)?;
         }
-
-        rule.run(&self.config, &self.macros, target)?;
+        rule.run(&self.config, &self.macros, target, up_to_date)?;
 
         Ok(true)
     }
