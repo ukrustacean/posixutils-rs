@@ -9,16 +9,16 @@
 
 use core::str::FromStr;
 use std::{
+    collections::HashMap,
     env,
     ffi::OsString,
     fs,
     io::{self, Read},
-    os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
     process,
 };
 
-use clap::{builder::PathBufValueParser, Parser};
+use clap::Parser;
 use const_format::formatcp;
 use gettextrs::{bind_textdomain_codeset, textdomain};
 use makefile_lossless::Makefile;
@@ -71,12 +71,20 @@ struct Args {
     )]
     quit: bool,
 
-    // #[arg(
-    //     short = 'p',
-    //     long,
-    //     help = "Write to standard output the complete set of macro definitions and target descriptions"
-    // )]
-    // print: bool,
+    #[arg(
+        short = 'r',
+        long,
+        help = "Clear the suffix list and do not use the built-in rules"
+    )]
+    clear: bool,
+
+    #[arg(
+        short = 'p',
+        long,
+        help = "Write to standard output the complete set of macro definitions and target descriptions."
+    )]
+    print: bool,
+
     #[arg(
         short = 't',
         long,
@@ -96,12 +104,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         directory,
         makefile,
         env_macros,
-        // print,
         ignore,
         dry_run,
         silent,
         quit,
+        clear,
         touch,
+        print,
         mut targets,
     } = Args::parse();
 
@@ -112,11 +121,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         env::set_current_dir(dir)?;
     }
 
-    let parsed = parse_makefile(makefile.as_ref()).unwrap_or_else(|err| {
-        eprintln!("make: {}", err);
-        process::exit(err.into());
-    });
-
     let config = Config {
         ignore,
         dry_run,
@@ -124,7 +128,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         touch,
         env_macros,
         quit,
+        ..Default::default()
     };
+    if print {
+        print!("{:?}", config.default_rules);
+        return Ok(());
+    }
+
+    let parsed = parse_makefile(makefile.as_ref()).unwrap_or_else(|err| {
+        eprintln!("make: {}", err);
+        process::exit(err.into());
+    });
 
     let make = Make::try_from((parsed, config)).unwrap_or_else(|err| {
         eprintln!("make: {err}");

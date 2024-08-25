@@ -8,6 +8,7 @@
 //
 
 use core::fmt;
+use std::collections::HashMap;
 
 use crate::{
     error_code::ErrorCode,
@@ -134,6 +135,7 @@ pub fn process(rule: Rule, make: &mut Make) -> Result<(), ErrorCode> {
         Default => this.process_default(),
         Ignore => this.process_ignore(),
         Silent => this.process_silent(),
+        Suffixes => this.process_suffixes(),
         unsupported => Err(Error::NotSupported(unsupported)),
     }
     .map_err(|err| ErrorCode::SpecialTargetConstraintNotFulfilled {
@@ -208,6 +210,22 @@ impl Processor<'_> {
         let what_to_do = |rule: &mut Rule| rule.config.silent = true;
         self.additive(what_to_do);
         self.global(what_to_do);
+
+        Ok(())
+    }
+
+    fn process_suffixes(mut self) -> Result<(), Error> {
+        if self.rule.prerequisites().count() == 0 {
+            self.make.config.default_rules = HashMap::new();
+        } else {
+            for suffix in self.rule.prerequisites() {
+                let mut new_suffixes = HashMap::new();
+                new_suffixes.insert(String::from(suffix.as_ref()), String::from(""));
+                if let Some(existing_suffixes) = self.make.config.default_rules.get_mut(&String::from(".SUFFIXES")) {
+                    existing_suffixes.extend(new_suffixes);
+                }
+            }
+        }
 
         Ok(())
     }

@@ -23,7 +23,7 @@ use std::{
 use crate::{
     config::Config as GlobalConfig,
     error_code::ErrorCode::{self, *},
-    get_modified_time, DEFAULT_SHELL, DEFAULT_SHELL_VAR,
+    DEFAULT_SHELL, DEFAULT_SHELL_VAR,
 };
 use config::Config;
 use makefile_lossless::{Rule as ParsedRule, VariableDefinition};
@@ -74,6 +74,9 @@ impl Rule {
             touch: global_touch,
             env_macros: global_env_macros,
             quit: global_quit,
+            default_rules: ref global_default_rules,
+            clear: global_clear,
+            print: global_print,
         } = *global_config;
         let Config {
             ignore: rule_ignore,
@@ -94,6 +97,18 @@ impl Rule {
             let touch = global_touch;
             let env_macros = global_env_macros;
             let quit = global_quit;
+            let clear = global_clear;
+            let print = global_print;
+            // Note: this feature can be implemented only with parser rewrite
+            // Todo: parse all suffixes and return error if default_rules don't include them
+            // -r flag
+            let default_rules = if clear {
+                HashMap::new()
+            } else {
+                global_default_rules.clone()
+            };
+
+            // Todo: somehow catch parse and print changed default_rules
 
             if !force_run {
                 // -n flag
@@ -131,6 +146,8 @@ impl Rule {
             self.init_env(env_macros, &mut command, macros);
 
             command.args(["-c", recipe.as_ref()]);
+
+            // dbg!(&command);
 
             let status = match command.status() {
                 Ok(status) => status,

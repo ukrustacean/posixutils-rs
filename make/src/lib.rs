@@ -34,7 +34,6 @@ pub struct Make {
     macros: Vec<VariableDefinition>,
     rules: Vec<Rule>,
     default_rule: Option<Rule>, // .DEFAULT
-
     pub config: Config,
 }
 
@@ -187,6 +186,7 @@ impl TryFrom<(Makefile, Config)> for Make {
                 rules.push(rule);
             }
         }
+
 
         let mut make = Self {
             rules,

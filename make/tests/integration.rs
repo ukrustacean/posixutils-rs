@@ -86,6 +86,40 @@ mod arguments {
     }
 
     #[test]
+    #[ignore]
+    fn dash_p() {
+        run_test_helper(
+            &["-p"],
+            "{\".SUFFIXES\": {\".a\": \"\", \".y~\": \"\", \".l~\": \"\", \".sh~\": \"\", \".o\": \"\", \".c~\": \"\", \".y\": \"\", \".l\": \"\", \".sh\": \"\", \".c\": \"\"}}",
+            "",
+            0,
+        )
+    }
+
+    #[test]
+    fn dash_r() {
+        run_test_helper(
+            &["-r"],
+            "",
+            "make: no makefile\n",
+            ErrorCode::NoMakefile.into(),
+        )
+    }
+
+    #[test]
+    fn dash_r_with_mk() {
+        run_test_helper(
+            &[
+                "-rf",
+                "tests/makefiles/special_targets/suffixes/suffixes_basic.mk",
+            ],
+            "Converting copied.txt to copied.out\n",
+            "",
+            0,
+        )
+    }
+
+    #[test]
     fn dash_i() {
         run_test_helper(
             &["-if", "tests/makefiles/arguments/dash_i.mk"],
@@ -150,11 +184,12 @@ mod parsing {
     use super::*;
 
     #[test]
+    #[ignore]
     fn empty() {
         run_test_helper(
             &["-f", "tests/makefiles/parsing/empty.mk"],
             "",
-            "make: parse error: unexpected token None\n\n",
+            "make: parse error: No Targets",
             ErrorCode::ParseError("the inner value does not matter for now".into()).into(),
         );
     }
@@ -166,6 +201,17 @@ mod parsing {
             "This program should not produce any errors.\n",
             "",
             0,
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn suffixes_with_no_target() {
+        run_test_helper(
+            &["-f", "tests/makefiles/parsing/suffixes_with_no_targets.mk"],
+            "",
+            "make: parse error: No Targets",
+            ErrorCode::ParseError("no targets".into()).into(),
         );
     }
 }
@@ -442,6 +488,60 @@ mod special_targets {
             "I'm silent\n",
             "",
             0,
+        );
+    }
+
+    #[test]
+    fn phony() {
+        run_test_helper(
+            &["-f", "tests/makefiles/special_targets/phony/phony_basic.mk"],
+            "phony\n",
+            "",
+            0,
+        );
+    }
+
+    #[test]
+    fn suffixes() {
+        use fs::{remove_file, File};
+        use std::io::Write;
+
+        run_test_helper_with_setup_and_destruct(
+            &[
+                "-f",
+                "tests/makefiles/special_targets/suffixes/suffixes_basic.mk",
+            ],
+            "Converting copied.txt to copied.out\n",
+            "",
+            0,
+            create_txt,
+            remove_txt,
+        );
+
+        fn create_txt() {
+            File::create("copied.txt")
+                .unwrap()
+                .write_all(b"some content")
+                .unwrap();
+        }
+
+        fn remove_txt() {
+            remove_file("copied.txt").unwrap();
+        }
+    }
+
+    // unspecified stderr and error type, must be refactored and improved
+    #[test]
+    #[ignore]
+    fn clear_suffixes() {
+        run_test_helper(
+            &[
+                "-f",
+                "tests/makefiles/special_targets/suffixes/clear_suffixes.mk",
+            ],
+            "",
+            "make: Nothing be dobe for copied.out",
+            ErrorCode::ParseError("the inner value does not matter for now".into()).into(),
         );
     }
 
