@@ -63,6 +63,9 @@ fn run_test_helper_with_setup_and_destruct(
 }
 
 mod arguments {
+    use fs::{remove_file, File};
+    use std::io::Write;
+
     use super::*;
 
     #[test]
@@ -108,15 +111,29 @@ mod arguments {
 
     #[test]
     fn dash_r_with_mk() {
-        run_test_helper(
+        run_test_helper_with_setup_and_destruct(
             &[
                 "-rf",
-                "tests/makefiles/special_targets/suffixes/suffixes_basic.mk",
+                "tests/makefiles/arguments/dash_r/with_suffixes.mk",
             ],
-            "Converting copied.txt to copied.out\n",
+            "Converting suff.txt to suff.out\n",
             "",
             0,
-        )
+            create_txt,
+            remove_files,
+        );
+
+        fn create_txt() {
+            File::create("suff.txt")
+                .unwrap()
+                .write_all(b"some content")
+                .unwrap();
+        }
+
+        fn remove_files() {
+            remove_file("suff.txt").unwrap();
+            remove_file("suff.out").unwrap();
+        }
     }
 
     #[test]
@@ -515,7 +532,7 @@ mod special_targets {
             "",
             0,
             create_txt,
-            remove_txt,
+            remove_files,
         );
 
         fn create_txt() {
@@ -525,8 +542,9 @@ mod special_targets {
                 .unwrap();
         }
 
-        fn remove_txt() {
+        fn remove_files() {
             remove_file("copied.txt").unwrap();
+            remove_file("copied.out").unwrap();
         }
     }
 

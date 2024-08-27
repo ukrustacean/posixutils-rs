@@ -74,7 +74,7 @@ impl Rule {
             touch: global_touch,
             env_macros: global_env_macros,
             quit: global_quit,
-            default_rules: ref global_default_rules,
+            rules: ref global_rules,
             clear: global_clear,
             print: global_print,
         } = *global_config;
@@ -100,12 +100,12 @@ impl Rule {
             let clear = global_clear;
             let print = global_print;
             // Note: this feature can be implemented only with parser rewrite
-            // Todo: parse all suffixes and return error if default_rules don't include them
+            // Todo: parse all suffixes and return error if rules don't include them
             // -r flag
-            let default_rules = if clear {
+            let rules = if clear {
                 HashMap::new()
             } else {
-                global_default_rules.clone()
+                global_rules.clone()
             };
 
             // Todo: somehow catch parse and print changed default_rules
@@ -146,8 +146,6 @@ impl Rule {
             self.init_env(env_macros, &mut command, macros);
 
             command.args(["-c", recipe.as_ref()]);
-
-            // dbg!(&command);
 
             let status = match command.status() {
                 Ok(status) => status,

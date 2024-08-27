@@ -9,7 +9,6 @@
 
 use core::str::FromStr;
 use std::{
-    collections::HashMap,
     env,
     ffi::OsString,
     fs,
@@ -128,12 +127,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         touch,
         env_macros,
         quit,
+        clear,
         ..Default::default()
     };
-    if print {
-        print!("{:?}", config.default_rules);
-        return Ok(());
-    }
 
     let parsed = parse_makefile(makefile.as_ref()).unwrap_or_else(|err| {
         eprintln!("make: {}", err);
@@ -144,6 +140,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         eprintln!("make: {err}");
         process::exit(err.into());
     });
+
+    // -p flag
+    if print {
+        print!("{:?}", make.config.rules);
+        return Ok(());
+    }
+
+
 
     if targets.is_empty() {
         let target = make

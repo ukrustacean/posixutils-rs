@@ -12,8 +12,15 @@ pub mod error_code;
 pub mod rule;
 pub mod special_target;
 
-use std::{collections::HashSet, fs, process, time::SystemTime};
+use std::{
+    collections::HashSet,
+    fs::{self, remove_file},
+    process,
+    sync::{Arc, LazyLock, Mutex},
+    time::SystemTime,
+};
 
+use libc::{signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 use makefile_lossless::{Makefile, VariableDefinition};
 
 use config::Config;
@@ -26,6 +33,23 @@ const DEFAULT_SHELL_VAR: &str = "SHELL";
 
 /// The default shell to use for running recipes. Linux and MacOS
 const DEFAULT_SHELL: &str = "/bin/sh";
+
+static INTERRUPT_FLAG: LazyLock<Arc<Mutex<Option<String>>>> =
+    LazyLock::new(|| Arc::new(Mutex::new(None)));
+
+fn handle_signals(signal_code: libc::c_int) {
+    let interrupt_flag = INTERRUPT_FLAG.lock().unwrap();
+
+    if let Some(target) = interrupt_flag.as_ref() {
+        eprintln!("make: Interrupt");
+        eprintln!("make: Deleting file '{}'", target);
+        if let Err(err) = remove_file(target) {
+            eprintln!("Error deleting file: {}", err);
+        }
+    }
+
+    process::exit(128 + signal_code);
+}
 
 /// Represents the make utility with its data and configuration.
 ///
@@ -175,18 +199,30 @@ impl TryFrom<(Makefile, Config)> for Make {
     fn try_from((makefile, config): (Makefile, Config)) -> Result<Self, Self::Error> {
         let mut rules = vec![];
         let mut special_rules = vec![];
+
+        if !config.ignore || !config.print || !config.quit || !config.dry_run {
+            unsafe {
+                signal(SIGINT, handle_signals as usize);
+                signal(SIGQUIT, handle_signals as usize);
+                signal(SIGTERM, handle_signals as usize);
+                signal(SIGHUP, handle_signals as usize);
+            }
+        }
+
         for rule in makefile.rules() {
             let rule = Rule::from(rule);
             let Some(target) = rule.targets().next() else {
                 return Err(NoTarget { target: None });
             };
+
+            *INTERRUPT_FLAG.lock().unwrap() = Some(target.as_ref().to_string());
+
             if SpecialTarget::try_from(target.clone()).is_ok() {
                 special_rules.push(rule);
             } else {
                 rules.push(rule);
             }
         }
-
 
         let mut make = Self {
             rules,

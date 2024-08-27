@@ -1,10 +1,9 @@
-.SUFFIXES: .txt .ot  # Define the suffixes
+.SUFFIXES: .txt .out  
 
 .txt.ot:  
 	@echo "Converting copied.txt to copied.out" 
-	@cp copied.txt copied.ot
+	@cp copied.txt copied.out
 
 
-# Specify the dependency for copied.out
 copied.ot: copied.txt
 

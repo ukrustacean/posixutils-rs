@@ -8,7 +8,7 @@
 //
 
 use core::fmt;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     error_code::ErrorCode,
@@ -21,6 +21,7 @@ pub enum SpecialTarget {
     Default,
     Ignore,
     Posix,
+    Phony,
     Precious,
     SccsGet,
     Silent,
@@ -46,6 +47,7 @@ impl AsRef<str> for SpecialTarget {
             SccsGet => ".SCCS_GET",
             Silent => ".SILENT",
             Suffixes => ".SUFFIXES",
+            Phony => ".PHONY",
         }
     }
 }
@@ -136,6 +138,7 @@ pub fn process(rule: Rule, make: &mut Make) -> Result<(), ErrorCode> {
         Ignore => this.process_ignore(),
         Silent => this.process_silent(),
         Suffixes => this.process_suffixes(),
+        Phony => this.process_phony(),
         unsupported => Err(Error::NotSupported(unsupported)),
     }
     .map_err(|err| ErrorCode::SpecialTargetConstraintNotFulfilled {
@@ -214,19 +217,29 @@ impl Processor<'_> {
         Ok(())
     }
 
-    fn process_suffixes(mut self) -> Result<(), Error> {
-        if self.rule.prerequisites().count() == 0 {
-            self.make.config.default_rules = HashMap::new();
+    fn process_suffixes(self) -> Result<(), Error> {
+        let suffixes_key = ".SUFFIXES";
+        let suffixes_set = self
+            .rule
+            .prerequisites()
+            .map(|suffix| suffix.as_ref().to_string())
+            .collect::<HashSet<String>>();
+
+        if suffixes_set.is_empty() {
+            self.make
+                .config
+                .rules
+                .insert(suffixes_key.to_string(), HashSet::new());
         } else {
-            for suffix in self.rule.prerequisites() {
-                let mut new_suffixes = HashMap::new();
-                new_suffixes.insert(String::from(suffix.as_ref()), String::from(""));
-                if let Some(existing_suffixes) = self.make.config.default_rules.get_mut(&String::from(".SUFFIXES")) {
-                    existing_suffixes.extend(new_suffixes);
-                }
-            }
+            self.make
+                .config
+                .rules
+                .insert(suffixes_key.to_string(), suffixes_set);
         }
 
+        Ok(())
+    }
+    fn process_phony(self) -> Result<(), Error> {
         Ok(())
     }
 }
