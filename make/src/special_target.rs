@@ -8,7 +8,7 @@
 //
 
 use core::fmt;
-use std::collections::{HashMap, HashSet};
+use std::collections::BTreeSet;
 
 use crate::{
     error_code::ErrorCode,
@@ -32,9 +32,10 @@ use SpecialTarget::*;
 
 impl SpecialTarget {
     // could be automated with `strum`
-    pub const COUNT: usize = 7;
-    pub const VARIANTS: [Self; Self::COUNT] =
-        [Default, Ignore, Posix, Precious, SccsGet, Silent, Suffixes];
+    pub const COUNT: usize = 8;
+    pub const VARIANTS: [Self; Self::COUNT] = [
+        Default, Ignore, Posix, Precious, SccsGet, Silent, Suffixes, Phony,
+    ];
 }
 
 impl AsRef<str> for SpecialTarget {
@@ -139,6 +140,7 @@ pub fn process(rule: Rule, make: &mut Make) -> Result<(), ErrorCode> {
         Silent => this.process_silent(),
         Suffixes => this.process_suffixes(),
         Phony => this.process_phony(),
+        Precious => this.process_precious(),
         unsupported => Err(Error::NotSupported(unsupported)),
     }
     .map_err(|err| ErrorCode::SpecialTargetConstraintNotFulfilled {
@@ -223,13 +225,13 @@ impl Processor<'_> {
             .rule
             .prerequisites()
             .map(|suffix| suffix.as_ref().to_string())
-            .collect::<HashSet<String>>();
+            .collect::<BTreeSet<String>>();
 
         if suffixes_set.is_empty() {
             self.make
                 .config
                 .rules
-                .insert(suffixes_key.to_string(), HashSet::new());
+                .insert(suffixes_key.to_string(), BTreeSet::new());
         } else {
             self.make
                 .config
@@ -239,7 +241,42 @@ impl Processor<'_> {
 
         Ok(())
     }
-    fn process_phony(self) -> Result<(), Error> {
+    fn process_phony(mut self) -> Result<(), Error> {
+        let suffixes_set = self
+            .rule
+            .prerequisites()
+            .map(|suffix| suffix.as_ref().to_string())
+            .collect::<BTreeSet<String>>();
+
+        self.make
+            .config
+            .rules
+            .insert(".PHONY".to_string(), suffixes_set);
+
+        let what_to_do = |rule: &mut Rule| rule.config.phony = true;
+        self.additive(what_to_do);
+        self.global(what_to_do);
+
+        Ok(())
+    }
+
+    
+    fn process_precious(mut self) -> Result<(), Error> {
+        let precious_set = self
+            .rule
+            .prerequisites()
+            .map(|val| val.as_ref().to_string())
+            .collect::<BTreeSet<String>>();
+
+        self.make
+            .config
+            .rules
+            .insert(".PRECIOUS".to_string(), precious_set);
+
+        let what_to_do = |rule: &mut Rule| rule.config.precious = true;
+        self.additive(what_to_do);
+        self.global(what_to_do);
+
         Ok(())
     }
 }

@@ -13,7 +13,7 @@ pub mod recipe;
 pub mod target;
 
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     env,
     fs::{File, FileTimes},
     process::{self, Command},
@@ -77,10 +77,14 @@ impl Rule {
             rules: ref global_rules,
             clear: global_clear,
             print: global_print,
+            keep_going: global_keep_going,
+            terminate: global_terminate,
         } = *global_config;
         let Config {
             ignore: rule_ignore,
             silent: rule_silent,
+            phony: rule_phony,
+            precious: rule_precious,
         } = self.config;
 
         for recipe in self.recipes() {
@@ -99,11 +103,14 @@ impl Rule {
             let quit = global_quit;
             let clear = global_clear;
             let print = global_print;
+            let phony = rule_phony;
+            let keep_going = global_keep_going;
+            let terminate = global_terminate;
             // Note: this feature can be implemented only with parser rewrite
             // Todo: parse all suffixes and return error if rules don't include them
             // -r flag
             let rules = if clear {
-                HashMap::new()
+                BTreeMap::new()
             } else {
                 global_rules.clone()
             };
@@ -157,11 +164,21 @@ impl Rule {
                     }
                 }
             };
-
             if !status.success() && !ignore {
-                return Err(ExecutionError {
-                    exit_code: status.code(),
-                });
+                // -S and -k flags
+                if !terminate && keep_going {
+                    eprintln!(
+                        "make: {:?}",
+                        ExecutionError {
+                            exit_code: status.code(),
+                        }
+                    );
+                    break;
+                } else {
+                    return Err(ExecutionError {
+                        exit_code: status.code(),
+                    });
+                }
             }
         }
 

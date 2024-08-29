@@ -9,6 +9,7 @@
 
 use core::str::FromStr;
 use std::{
+    collections::{BTreeMap, BTreeSet},
     env,
     ffi::OsString,
     fs,
@@ -39,6 +40,9 @@ const MAKEFILE_PATH: [&str; 2] = [
 struct Args {
     #[arg(short = 'C', long, help = "Change to DIRECTORY before doing anything")]
     directory: Option<PathBuf>,
+    
+    #[arg(short = 'S', long, help = "Terminate make if error occurs. Default behavior")]
+    terminate: bool,
 
     #[arg(short = 'f', long, help = "Path to the makefile to parse")]
     makefile: Option<PathBuf>,
@@ -69,6 +73,13 @@ struct Args {
         help = "Return a zero exit value if the target file is up-to-date; otherwise, return an exit value of 1."
     )]
     quit: bool,
+
+    #[arg(
+        short = 'k',
+        long,
+        help = "Continue to update other targets that do not depend on the current target if a non-ignored error occur"
+    )]
+    keep_going: bool,
 
     #[arg(
         short = 'r',
@@ -110,6 +121,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         clear,
         touch,
         print,
+        terminate,
+        keep_going,
         mut targets,
     } = Args::parse();
 
@@ -127,14 +140,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         touch,
         env_macros,
         quit,
+        keep_going,
         clear,
+        terminate,
         ..Default::default()
     };
 
-    let parsed = parse_makefile(makefile.as_ref()).unwrap_or_else(|err| {
-        eprintln!("make: {}", err);
-        process::exit(err.into());
-    });
+    let parsed = match parse_makefile(makefile.as_ref()) {
+        Ok(parsed) => parsed,
+        Err(err) => {
+            // -p flag
+            if print {
+                // If makefile is not provided or parsing failed, print the default rules
+                print_rules(&config.rules)?;
+                return Ok(());
+            } else {
+                eprintln!("make: {}", err);
+                process::exit(err.into());
+            }
+        }
+    };
 
     let make = Make::try_from((parsed, config)).unwrap_or_else(|err| {
         eprintln!("make: {err}");
@@ -143,11 +168,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // -p flag
     if print {
-        print!("{:?}", make.config.rules);
-        return Ok(());
+        // Call print for  global config rules
+        print_rules(&make.config.rules)?;
     }
-
-
 
     if targets.is_empty() {
         let target = make
@@ -176,12 +199,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
+        if keep_going {
+            eprintln!("make: Target {} not remade because of errors", target);
+            status_code = 2;
+        }
+
         if status_code != 0 {
             break;
         }
     }
 
     process::exit(status_code);
+}
+
+fn print_rules(
+    rules: &BTreeMap<String, BTreeSet<String>>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    print!("{:?}", rules);
+    Ok(())
 }
 
 /// Parse the makefile at the given path, or the first default makefile found.

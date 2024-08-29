@@ -7,7 +7,8 @@
 // SPDX-License-Identifier: MIT
 //
 
-use std::fs;
+use std::fs::{remove_file, File};
+use std::io::Write;
 
 use plib::{run_test, TestPlan};
 use posixutils_make::error_code::ErrorCode;
@@ -63,8 +64,6 @@ fn run_test_helper_with_setup_and_destruct(
 }
 
 mod arguments {
-    use fs::{remove_file, File};
-    use std::io::Write;
 
     use super::*;
 
@@ -79,6 +78,16 @@ mod arguments {
     }
 
     #[test]
+    fn dash_cap_s() {
+        run_test_helper(
+            &["-SC", "tests/makefiles/arguments/dash_cap_s"],
+            "OK\n",
+            "make: execution error: 1\n",
+            2,
+        )
+    }
+
+    #[test]
     fn dash_f() {
         run_test_helper(
             &["-f", "tests/makefiles/arguments/dash_f.mk"],
@@ -89,11 +98,19 @@ mod arguments {
     }
 
     #[test]
-    #[ignore]
     fn dash_p() {
         run_test_helper(
             &["-p"],
-            "{\".SUFFIXES\": {\".a\": \"\", \".y~\": \"\", \".l~\": \"\", \".sh~\": \"\", \".o\": \"\", \".c~\": \"\", \".y\": \"\", \".l\": \"\", \".sh\": \"\", \".c\": \"\"}}",
+            "{\".MACROS\": {\"AR=ar\", \"ARFLAGS=-rv\", \"CC=c17\", \"CFLAGS=-O 1\", \"GFLAGS=\", \"LDFLAGS=\", \"LEX=lex\", \"LFLAGS=\", \"SCCSFLAGS=\", \"SCCSGETFLAGS=-s\", \"XSI GET=get\", \"YACC=yacc\", \"YFLAGS=\"}, \".SCCS_GET\": {\"sccs $(SCCSFLAGS) get $(SCCSGETFLAGS) $@\"}, \".SUFFIXES\": {\".a\", \".c\", \".c~\", \".l\", \".l~\", \".o\", \".sh\", \".sh~\", \".y\", \".y~\"}, \"SUFFIX RULES\": {\".c.a: $(CC) -c $(CFLAGS) $<; $(AR) $(ARFLAGS) $@ $*.o; rm -f $*.o\", \".c.o: $(CC) $(CFLAGS) -c $<\", \".c: $(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<\", \".l.c: $(LEX) $(LFLAGS) $<; mv lex.yy.c $@\", \".l.o: $(LEX) $(LFLAGS) $<; $(CC) $(CFLAGS) -c lex.yy.c; rm -f lex.yy.c; mv lex.yy.o $@\", \".l~.c: $(GET) $(GFLAGS) -p $< > $*.l; $(LEX) $(LFLAGS) $*.l; mv lex.yy.c $@\", \".l~.o: $(GET) $(GFLAGS) -p $< > $*.l; $(LEX) $(LFLAGS) $*.l; $(CC) $(CFLAGS) -c lex.yy.c; rm -f lex.yy.c; mv lex.yy.o $@\", \".sh: chmod a+x $@\", \".sh: cp $< $@\", \".y.c: $(YACC) $(YFLAGS) $<; mv y.tab.c $@\", \".y.o: $(YACC) $(YFLAGS) $<; $(CC) $(CFLAGS) -c y.tab.c; rm -f y.tab.c; mv y.tab.o $@\", \".y~.c: $(GET) $(GFLAGS) -p $< > $*.y; $(YACC) $(YFLAGS) $*.y; mv y.tab.c $@\", \".y~.o: $(GET) $(GFLAGS) -p $< > $*.y; $(YACC) $(YFLAGS) $*.y; $(CC) $(CFLAGS) -c y.tab.c; rm -f y.tab.c; mv y.tab.o $@\", \"XSI .c~.o: $(GET) $(GFLAGS) -p $< > $*.c; $(CC) $(CFLAGS) -c $*.c\"}}",
+            "",
+            0,
+        )
+    }
+    #[test]
+    fn dash_p_with_mk() {
+        run_test_helper(
+            &["-pf", "tests/makefiles/arguments/dash_p/with_phony.mk"],
+            "{\".MACROS\": {\"AR=ar\", \"ARFLAGS=-rv\", \"CC=c17\", \"CFLAGS=-O 1\", \"GFLAGS=\", \"LDFLAGS=\", \"LEX=lex\", \"LFLAGS=\", \"SCCSFLAGS=\", \"SCCSGETFLAGS=-s\", \"XSI GET=get\", \"YACC=yacc\", \"YFLAGS=\"}, \".PHONY\": {\"clean\"}, \".SCCS_GET\": {\"sccs $(SCCSFLAGS) get $(SCCSGETFLAGS) $@\"}, \".SUFFIXES\": {\".a\", \".c\", \".c~\", \".l\", \".l~\", \".o\", \".sh\", \".sh~\", \".y\", \".y~\"}, \"SUFFIX RULES\": {\".c.a: $(CC) -c $(CFLAGS) $<; $(AR) $(ARFLAGS) $@ $*.o; rm -f $*.o\", \".c.o: $(CC) $(CFLAGS) -c $<\", \".c: $(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<\", \".l.c: $(LEX) $(LFLAGS) $<; mv lex.yy.c $@\", \".l.o: $(LEX) $(LFLAGS) $<; $(CC) $(CFLAGS) -c lex.yy.c; rm -f lex.yy.c; mv lex.yy.o $@\", \".l~.c: $(GET) $(GFLAGS) -p $< > $*.l; $(LEX) $(LFLAGS) $*.l; mv lex.yy.c $@\", \".l~.o: $(GET) $(GFLAGS) -p $< > $*.l; $(LEX) $(LFLAGS) $*.l; $(CC) $(CFLAGS) -c lex.yy.c; rm -f lex.yy.c; mv lex.yy.o $@\", \".sh: chmod a+x $@\", \".sh: cp $< $@\", \".y.c: $(YACC) $(YFLAGS) $<; mv y.tab.c $@\", \".y.o: $(YACC) $(YFLAGS) $<; $(CC) $(CFLAGS) -c y.tab.c; rm -f y.tab.c; mv y.tab.o $@\", \"some\n.y~.c: $(GET) $(GFLAGS) -p $< > $*.y; $(YACC) $(YFLAGS) $*.y; mv y.tab.c $@\", \".y~.o: $(GET) $(GFLAGS) -p $< > $*.y; $(YACC) $(YFLAGS) $*.y; $(CC) $(CFLAGS) -c y.tab.c; rm -f y.tab.c; mv y.tab.o $@\", \"XSI .c~.o: $(GET) $(GFLAGS) -p $< > $*.c; $(CC) $(CFLAGS) -c $*.c\"}}",
             "",
             0,
         )
@@ -112,10 +129,7 @@ mod arguments {
     #[test]
     fn dash_r_with_mk() {
         run_test_helper_with_setup_and_destruct(
-            &[
-                "-rf",
-                "tests/makefiles/arguments/dash_r/with_suffixes.mk",
-            ],
+            &["-rf", "tests/makefiles/arguments/dash_r/with_suffixes.mk"],
             "Converting suff.txt to suff.out\n",
             "",
             0,
@@ -171,7 +185,7 @@ mod arguments {
         let remove_touches = || {
             let dir = "tests/makefiles/arguments/dash_t";
             for i in 1..=2 {
-                let _ = fs::remove_file(format!("{dir}/rule{i}"));
+                let _ = remove_file(format!("{dir}/rule{i}"));
             }
         };
 
@@ -192,6 +206,15 @@ mod arguments {
             "",
             "",
             1,
+        );
+    }
+    #[test]
+    fn dash_k() {
+        run_test_helper(
+            &["-kf", "tests/makefiles/arguments/dash_k.mk"],
+            "OK\necho 12\n12\n",
+            "make: ExecutionError { exit_code: Some(1) }\nmake: Target z not remade because of errors\n",
+            2,
         );
     }
 }
@@ -297,6 +320,9 @@ mod macros {
 }
 
 mod target_behavior {
+
+    use std::{thread, time::Duration};
+
     use super::*;
 
     #[test]
@@ -347,7 +373,7 @@ mod target_behavior {
         let remove_touches = || {
             let dir = "tests/makefiles/target_behavior/diamond_chaining_with_touches";
             for i in 1..=5 {
-                let _ = fs::remove_file(format!("{}/rule{}", dir, i));
+                let _ = remove_file(format!("{}/rule{}", dir, i));
             }
         };
 
@@ -426,9 +452,8 @@ mod recipes {
             #[test]
             fn with_touch() {
                 let remove_touches = || {
-                    let _ = fs::remove_file(
-                        "tests/makefiles/recipes/prefixes/force_run/with_touch/rule",
-                    );
+                    let _ =
+                        remove_file("tests/makefiles/recipes/prefixes/force_run/with_touch/rule");
                 };
 
                 run_test_helper_with_setup_and_destruct(
@@ -512,17 +537,14 @@ mod special_targets {
     fn phony() {
         run_test_helper(
             &["-f", "tests/makefiles/special_targets/phony/phony_basic.mk"],
-            "phony\n",
-            "",
-            0,
+            "rm temp\n",
+            "rm: cannot remove 'temp': No such file or directory\nmake: execution error: 1\n",
+            2,
         );
     }
 
     #[test]
     fn suffixes() {
-        use fs::{remove_file, File};
-        use std::io::Write;
-
         run_test_helper_with_setup_and_destruct(
             &[
                 "-f",
@@ -557,7 +579,7 @@ mod special_targets {
                 "-f",
                 "tests/makefiles/special_targets/suffixes/clear_suffixes.mk",
             ],
-            "",
+            "Converting $< to \n",
             "make: Nothing be dobe for copied.out",
             ErrorCode::ParseError("the inner value does not matter for now".into()).into(),
         );

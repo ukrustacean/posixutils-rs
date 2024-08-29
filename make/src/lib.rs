@@ -116,7 +116,11 @@ impl Make {
         }
 
         let newer_prerequisites = self.get_newer_prerequisites(target);
-        let up_to_date = newer_prerequisites.is_empty() && get_modified_time(target).is_some();
+        let mut up_to_date = newer_prerequisites.is_empty() && get_modified_time(target).is_some();
+        if rule.config.phony {
+            up_to_date = false;
+        }
+
         if up_to_date {
             return Ok(false);
         }

@@ -7,7 +7,7 @@
 // SPDX-License-Identifier: MIT
 //
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Represents the configuration of the make utility
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -24,12 +24,17 @@ pub struct Config {
     pub env_macros: bool,
     /// Whether to quit without build
     pub quit: bool,
+    /// Whether to keep going build targets and write info about errors stderr
+    pub keep_going: bool,
+    /// Whether to terminate on error
+    pub terminate: bool,
     /// Whether to clear default_rules
     pub clear: bool,
     /// Whether to print macro definitions and target descriptions.
     pub print: bool,
 
-    pub rules: HashMap<String, HashSet<String>>,
+
+    pub rules: BTreeMap<String, BTreeSet<String>>,
 }
 
 impl Default for Config {
@@ -40,10 +45,12 @@ impl Default for Config {
             silent: false,
             touch: false,
             env_macros: false,
+            keep_going: false,
             quit: false,
             clear: false,
             print: false,
-            rules: HashMap::from([
+            terminate: true, 
+            rules: BTreeMap::from([
                 (
                     ".SUFFIXES".to_string(),
                     vec![
@@ -55,7 +62,7 @@ impl Default for Config {
                 ),
                 (
                     ".SCCS_GET".to_string(),
-                    HashSet::from([String::from("sccs $(SCCSFLAGS) get $(SCCSGETFLAGS) $@")]),
+                    BTreeSet::from([String::from("sccs $(SCCSFLAGS) get $(SCCSGETFLAGS) $@")]),
                 ),
                 (
                     ".MACROS".to_string(),
@@ -80,7 +87,7 @@ impl Default for Config {
                 ),
                 (
                     "SUFFIX RULES".to_string(),
-                    HashSet::from([
+                    BTreeSet::from([
                         // Single-Suffix Rules
                         ".c: $(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<",
                         ".sh: cp $< $@",
@@ -101,7 +108,7 @@ impl Default for Config {
                     ]
                     .into_iter()
                     .map(String::from)
-                    .collect::<HashSet<String>>(),
+                    .collect::<BTreeSet<String>>(),
                 ),
             )
             ]),
