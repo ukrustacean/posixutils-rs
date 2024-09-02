@@ -32,6 +32,8 @@ pub struct Config {
     pub clear: bool,
     /// Whether to print macro definitions and target descriptions.
     pub print: bool,
+    /// Whether to not delete interrupted files on async events.
+    pub precious: bool,
 
 
     pub rules: BTreeMap<String, BTreeSet<String>>,
@@ -49,6 +51,7 @@ impl Default for Config {
             quit: false,
             clear: false,
             print: false,
+            precious: false,
             terminate: true, 
             rules: BTreeMap::from([
                 (

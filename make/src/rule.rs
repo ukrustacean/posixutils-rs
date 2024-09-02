@@ -17,13 +17,14 @@ use std::{
     env,
     fs::{File, FileTimes},
     process::{self, Command},
+    sync::{Arc, LazyLock, Mutex},
     time::SystemTime,
 };
 
 use crate::{
     config::Config as GlobalConfig,
     error_code::ErrorCode::{self, *},
-    DEFAULT_SHELL, DEFAULT_SHELL_VAR,
+    signal_handler, DEFAULT_SHELL, DEFAULT_SHELL_VAR,
 };
 use config::Config;
 use makefile_lossless::{Rule as ParsedRule, VariableDefinition};
@@ -31,6 +32,9 @@ use prerequisite::Prerequisite;
 use recipe::config::Config as RecipeConfig;
 use recipe::Recipe;
 use target::Target;
+
+pub static INTERRUPT_FLAG: LazyLock<Arc<Mutex<Option<(String, bool)>>>> =
+    LazyLock::new(|| Arc::new(Mutex::new(None)));
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Rule {
@@ -79,6 +83,7 @@ impl Rule {
             print: global_print,
             keep_going: global_keep_going,
             terminate: global_terminate,
+            precious: global_precious,
         } = *global_config;
         let Config {
             ignore: rule_ignore,
@@ -104,6 +109,7 @@ impl Rule {
             let clear = global_clear;
             let print = global_print;
             let phony = rule_phony;
+            let precious = global_precious || rule_precious;
             let keep_going = global_keep_going;
             let terminate = global_terminate;
             // Note: this feature can be implemented only with parser rewrite
@@ -114,6 +120,12 @@ impl Rule {
             } else {
                 global_rules.clone()
             };
+
+            *INTERRUPT_FLAG.lock().unwrap() = Some((target.as_ref().to_string(), precious));
+
+            if !ignore || print || quit || dry_run {
+                signal_handler::register_signals();
+            }
 
             // Todo: somehow catch parse and print changed default_rules
 

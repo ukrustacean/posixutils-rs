@@ -1,4 +1,3 @@
-.PREIOUS: text.txt
-
+.PRECIOUS: 
 text.txt:
 	./create_file.sh

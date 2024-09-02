@@ -1,5 +1,5 @@
 #!/bin/bash
 echo hello 
 touch text.txt
-sleep 30
+sleep 3
 echo bye 

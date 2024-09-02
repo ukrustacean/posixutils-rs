@@ -320,9 +320,6 @@ mod macros {
 }
 
 mod target_behavior {
-
-    use std::{thread, time::Duration};
-
     use super::*;
 
     #[test]
@@ -495,6 +492,10 @@ mod recipes {
 }
 
 mod special_targets {
+    use std::{process::Stdio, thread, time::Duration};
+
+    use clap::Command;
+    use libc::signal;
     use posixutils_make::special_target;
 
     use super::*;
@@ -541,6 +542,78 @@ mod special_targets {
             "rm: cannot remove 'temp': No such file or directory\nmake: execution error: 1\n",
             2,
         );
+    }
+
+    #[test]
+    fn sccs_get() {
+        run_test_helper(
+            &["-f", "tests/makefiles/special_targets/sccs/basic_sccs.mk"],
+            "something\n",
+            "",
+            0,
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn precious() {
+        use libc::{kill, SIGINT};
+        use std::process::{Command, Stdio};
+        use std::thread;
+        use std::time::Duration;
+
+        run_test_helper_with_setup_and_destruct(
+            &[
+                "-f",
+                "tests/makefiles/special_targets/precious/basic_precious.mk",
+            ],
+            "./create_file.sh\n",
+            "",
+            0,
+            call_signal,
+            clean_env_vars,
+        );
+
+        fn call_signal() {
+            File::create("create_file.sh")
+                .unwrap()
+                .write_all(
+                    b"
+                        #!/bin/bash
+echo hello 
+touch text.txt
+sleep 3
+echo bye 
+
+                    ",
+                )
+                .unwrap();
+            // Start the `make` command
+            let mut child = Command::new("make")
+                .args(&[
+                    "-f",
+                    "tests/makefiles/special_targets/precious/basic_precious.mk",
+                ])
+                .stdout(Stdio::piped())
+                .spawn()
+                .expect("Failed to start `make`");
+
+            // Wait for a bit to ensure the `sleep` in `create_file.sh` is running
+            thread::sleep(Duration::from_secs(1));
+
+            // Send SIGINT to the `make` process using libc
+            let pid = child.id() as i32;
+            unsafe {
+                kill(pid, SIGINT);
+            }
+
+            // Wait for the child process to exit
+            let _ = child.wait().expect("Failed to wait on child process");
+        }
+
+        fn clean_env_vars() {
+            // Implement any necessary environment cleanup here
+        }
     }
 
     #[test]

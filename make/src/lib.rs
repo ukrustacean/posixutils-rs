@@ -10,17 +10,15 @@
 pub mod config;
 pub mod error_code;
 pub mod rule;
+pub mod signal_handler;
 pub mod special_target;
 
 use std::{
     collections::HashSet,
-    fs::{self, remove_file},
-    process,
-    sync::{Arc, LazyLock, Mutex},
+    fs::{self},
     time::SystemTime,
 };
 
-use libc::{signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 use makefile_lossless::{Makefile, VariableDefinition};
 
 use config::Config;
@@ -34,26 +32,10 @@ const DEFAULT_SHELL_VAR: &str = "SHELL";
 /// The default shell to use for running recipes. Linux and MacOS
 const DEFAULT_SHELL: &str = "/bin/sh";
 
-static INTERRUPT_FLAG: LazyLock<Arc<Mutex<Option<String>>>> =
-    LazyLock::new(|| Arc::new(Mutex::new(None)));
-
-fn handle_signals(signal_code: libc::c_int) {
-    let interrupt_flag = INTERRUPT_FLAG.lock().unwrap();
-
-    if let Some(target) = interrupt_flag.as_ref() {
-        eprintln!("make: Interrupt");
-        eprintln!("make: Deleting file '{}'", target);
-        if let Err(err) = remove_file(target) {
-            eprintln!("Error deleting file: {}", err);
-        }
-    }
-
-    process::exit(128 + signal_code);
-}
 
 /// Represents the make utility with its data and configuration.
 ///
-/// The only way to create a `Make` is from a `Makefile` and a `Config`.
+/// The only way to create a Make is from a Makefile and a Config.
 pub struct Make {
     macros: Vec<VariableDefinition>,
     rules: Vec<Rule>,
@@ -66,8 +48,8 @@ impl Make {
     ///
     /// # Returns
     ///
-    /// - `Some(rule)` if a rule with the target exists.
-    /// - `None` if no rule with the target exists.
+    /// - Some(rule) if a rule with the target exists.
+    /// - None if no rule with the target exists.
     fn rule_by_target_name(&self, target: impl AsRef<str>) -> Option<&Rule> {
         self.rules
             .iter()
@@ -82,9 +64,9 @@ impl Make {
     /// Builds the target with the given name.
     ///
     /// # Returns
-    /// - `Ok(true)` if the target was built.
-    /// - `Ok(false)` if the target was already up to date.
-    /// - `Err(_)` if any errors occur.
+    /// - Ok(true) if the target was built.
+    /// - Ok(false) if the target was already up to date.
+    /// - Err(_) if any errors occur.
     pub fn build_target(&self, name: impl AsRef<str>) -> Result<bool, ErrorCode> {
         let rule = match self.rule_by_target_name(&name) {
             Some(rule) => rule,
@@ -105,9 +87,9 @@ impl Make {
     /// Runs the given rule.
     ///
     /// # Returns
-    /// - Ok(`true`) if the rule was run.
-    /// - Ok(`false`) if the rule was already up to date.
-    /// - `Err(_)` if any errors occur.
+    /// - Ok(true) if the rule was run.
+    /// - Ok(false) if the rule was already up to date.
+    /// - Err(_) if any errors occur.
     fn run_rule_with_prerequisites(&self, rule: &Rule, target: &Target) -> Result<bool, ErrorCode> {
         if self.are_prerequisites_recursive(target) {
             return Err(RecursivePrerequisite {
@@ -161,7 +143,7 @@ impl Make {
     }
 
     /// Checks if the target has recursive prerequisites.
-    /// Returns `true` if the target has recursive prerequisites.
+    /// Returns true if the target has recursive prerequisites.
     fn are_prerequisites_recursive(&self, target: impl AsRef<str>) -> bool {
         let mut visited = HashSet::from([target.as_ref()]);
         let mut stack = HashSet::from([target.as_ref()]);
@@ -204,22 +186,12 @@ impl TryFrom<(Makefile, Config)> for Make {
         let mut rules = vec![];
         let mut special_rules = vec![];
 
-        if !config.ignore || !config.print || !config.quit || !config.dry_run {
-            unsafe {
-                signal(SIGINT, handle_signals as usize);
-                signal(SIGQUIT, handle_signals as usize);
-                signal(SIGTERM, handle_signals as usize);
-                signal(SIGHUP, handle_signals as usize);
-            }
-        }
-
         for rule in makefile.rules() {
             let rule = Rule::from(rule);
             let Some(target) = rule.targets().next() else {
                 return Err(NoTarget { target: None });
             };
 
-            *INTERRUPT_FLAG.lock().unwrap() = Some(target.as_ref().to_string());
 
             if SpecialTarget::try_from(target.clone()).is_ok() {
                 special_rules.push(rule);
@@ -238,6 +210,7 @@ impl TryFrom<(Makefile, Config)> for Make {
         for rule in special_rules {
             special_target::process(rule, &mut make)?;
         }
+
 
         Ok(make)
     }

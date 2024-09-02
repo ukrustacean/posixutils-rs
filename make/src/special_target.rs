@@ -141,6 +141,7 @@ pub fn process(rule: Rule, make: &mut Make) -> Result<(), ErrorCode> {
         Suffixes => this.process_suffixes(),
         Phony => this.process_phony(),
         Precious => this.process_precious(),
+        SccsGet => this.process_sccs_get(),
         unsupported => Err(Error::NotSupported(unsupported)),
     }
     .map_err(|err| ErrorCode::SpecialTargetConstraintNotFulfilled {
@@ -260,7 +261,6 @@ impl Processor<'_> {
         Ok(())
     }
 
-    
     fn process_precious(mut self) -> Result<(), Error> {
         let precious_set = self
             .rule
@@ -268,14 +268,30 @@ impl Processor<'_> {
             .map(|val| val.as_ref().to_string())
             .collect::<BTreeSet<String>>();
 
+        let what_to_do = |rule: &mut Rule| rule.config.precious = true;
+
+        self.additive(what_to_do);
+        self.global(what_to_do);
+
         self.make
             .config
             .rules
             .insert(".PRECIOUS".to_string(), precious_set);
+        Ok(())
+    }
+    fn process_sccs_get(self) -> Result<(), Error> {
+        self.without_prerequisites()?;
 
-        let what_to_do = |rule: &mut Rule| rule.config.precious = true;
-        self.additive(what_to_do);
-        self.global(what_to_do);
+        let sccs_set = self
+            .rule
+            .recipes()
+            .map(|val| val.as_ref().to_string())
+            .collect::<BTreeSet<String>>();
+
+        self.make
+            .config
+            .rules
+            .insert(".SCCS_GET".to_string(), sccs_set);
 
         Ok(())
     }
