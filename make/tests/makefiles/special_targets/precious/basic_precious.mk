@@ -1,3 +1,6 @@
-.PRECIOUS: 
+.PRECIOUS: 	
 text.txt:
-	./create_file.sh
+	echo hello
+	touch some.txt
+	sleep 1
+	echo bye

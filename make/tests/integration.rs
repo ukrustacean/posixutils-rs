@@ -7,8 +7,10 @@
 // SPDX-License-Identifier: MIT
 //
 
+use std::env;
 use std::fs::{remove_file, File};
 use std::io::Write;
+use std::process::{Child, Command, Stdio};
 
 use plib::{run_test, TestPlan};
 use posixutils_make::error_code::ErrorCode;
@@ -61,6 +63,31 @@ fn run_test_helper_with_setup_and_destruct(
     setup();
     run_test_helper(args, expected_output, expected_error, expected_exit_code);
     destruct();
+}
+
+fn manual_test_helper(args: &[&str]) -> Child {
+    // Determine the binary path based on the build profile
+    let relpath = if cfg!(debug_assertions) {
+        format!("target/debug/{}", "make")
+    } else {
+        format!("target/release/{}", "make")
+    };
+
+    // Build the full path to the binary
+    let test_bin_path = env::current_dir()
+        .expect("failed to get current directory")
+        .parent()
+        .expect("failed to get parent directory")
+        .join(relpath);
+
+    // Create and spawn the command
+    Command::new(test_bin_path)
+        .args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("failed to spawn command")
 }
 
 mod arguments {
@@ -127,27 +154,20 @@ mod arguments {
     }
 
     #[test]
-    fn dash_r_with_mk() {
+    fn dash_r_with_file() {
         run_test_helper_with_setup_and_destruct(
-            &["-rf", "tests/makefiles/arguments/dash_r/with_suffixes.mk"],
-            "Converting suff.txt to suff.out\n",
+            &["-rf", "tests/makefiles/arguments/dash_r/with_file.mk"],
+            "Converting testfile.txt to testfile.out\n",
             "",
             0,
-            create_txt,
-            remove_files,
+            || {
+                File::create("testfile.txt").expect("failed to create file");
+            },
+            || {
+                remove_file("testfile.txt").expect("failed to remove file");
+                remove_file("testfile.out").expect("failed to remove file");
+            },
         );
-
-        fn create_txt() {
-            File::create("suff.txt")
-                .unwrap()
-                .write_all(b"some content")
-                .unwrap();
-        }
-
-        fn remove_files() {
-            remove_file("suff.txt").unwrap();
-            remove_file("suff.out").unwrap();
-        }
     }
 
     #[test]
@@ -320,6 +340,9 @@ mod macros {
 }
 
 mod target_behavior {
+    use libc::{kill, SIGINT};
+    use std::{thread, time::Duration};
+
     use super::*;
 
     #[test]
@@ -401,6 +424,33 @@ mod target_behavior {
             }
             .into(),
         );
+    }
+
+    #[test]
+    fn async_events() {
+        let args = [
+            "-f",
+            "tests/makefiles/target_behavior/async_events/signal.mk",
+        ];
+        let child = manual_test_helper(&args);
+        let pid = child.id() as i32;
+
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(100));
+            unsafe {
+                kill(pid, SIGINT);
+            }
+        });
+
+        let output = child.wait_with_output().expect("failed to wait for child");
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert_eq!(stdout, "echo \"hello\"\nhello\ntouch text.txt\nsleep 1\n");
+
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert_eq!(stderr, "make: Interrupt\nmake: Deleting file 'text.txt'\n");
+
+        assert_eq!(output.status.code(), Some(130));
     }
 }
 
@@ -492,13 +542,11 @@ mod recipes {
 }
 
 mod special_targets {
-    use std::{process::Stdio, thread, time::Duration};
-
-    use clap::Command;
-    use libc::signal;
-    use posixutils_make::special_target;
+    use std::{fs, thread, time::Duration};
 
     use super::*;
+    use libc::{kill, SIGINT};
+    use posixutils_make::special_target;
 
     #[test]
     fn default() {
@@ -547,73 +595,40 @@ mod special_targets {
     #[test]
     fn sccs_get() {
         run_test_helper(
-            &["-f", "tests/makefiles/special_targets/sccs/basic_sccs.mk"],
-            "something\n",
+            &["-pf", "tests/makefiles/special_targets/sccs/basic_sccs.mk"],
+            "{\".MACROS\": {\"AR=ar\", \"ARFLAGS=-rv\", \"CC=c17\", \"CFLAGS=-O 1\", \"GFLAGS=\", \"LDFLAGS=\", \"LEX=lex\", \"LFLAGS=\", \"SCCSFLAGS=\", \"SCCSGETFLAGS=-s\", \"XSI GET=get\", \"YACC=yacc\", \"YFLAGS=\"}, \".SCCS_GET\": {\"echo \\\"executing command\\\"\"}, \".SUFFIXES\": {\".a\", \".c\", \".c~\", \".l\", \".l~\", \".o\", \".sh\", \".sh~\", \".y\", \".y~\"}, \"SUFFIX RULES\": {\".c.a: $(CC) -c $(CFLAGS) $<; $(AR) $(ARFLAGS) $@ $*.o; rm -f $*.o\", \".c.o: $(CC) $(CFLAGS) -c $<\", \".c: $(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<\", \".l.c: $(LEX) $(LFLAGS) $<; mv lex.yy.c $@\", \".l.o: $(LEX) $(LFLAGS) $<; $(CC) $(CFLAGS) -c lex.yy.c; rm -f lex.yy.c; mv lex.yy.o $@\", \".l~.c: $(GET) $(GFLAGS) -p $< > $*.l; $(LEX) $(LFLAGS) $*.l; mv lex.yy.c $@\", \".l~.o: $(GET) $(GFLAGS) -p $< > $*.l; $(LEX) $(LFLAGS) $*.l; $(CC) $(CFLAGS) -c lex.yy.c; rm -f lex.yy.c; mv lex.yy.o $@\", \".sh: chmod a+x $@\", \".sh: cp $< $@\", \".y.c: $(YACC) $(YFLAGS) $<; mv y.tab.c $@\", \".y.o: $(YACC) $(YFLAGS) $<; $(CC) $(CFLAGS) -c y.tab.c; rm -f y.tab.c; mv y.tab.o $@\", \"something\n.y~.c: $(GET) $(GFLAGS) -p $< > $*.y; $(YACC) $(YFLAGS) $*.y; mv y.tab.c $@\", \".y~.o: $(GET) $(GFLAGS) -p $< > $*.y; $(YACC) $(YFLAGS) $*.y; $(CC) $(CFLAGS) -c y.tab.c; rm -f y.tab.c; mv y.tab.o $@\", \"XSI .c~.o: $(GET) $(GFLAGS) -p $< > $*.c; $(CC) $(CFLAGS) -c $*.c\"}}",
             "",
             0,
         );
     }
 
     #[test]
-    #[ignore]
     fn precious() {
-        use libc::{kill, SIGINT};
-        use std::process::{Command, Stdio};
-        use std::thread;
-        use std::time::Duration;
+        let args = [
+            "-f",
+            "tests/makefiles/special_targets/precious/basic_precious.mk",
+        ];
+        let child = manual_test_helper(&args);
+        let pid = child.id() as i32;
 
-        run_test_helper_with_setup_and_destruct(
-            &[
-                "-f",
-                "tests/makefiles/special_targets/precious/basic_precious.mk",
-            ],
-            "./create_file.sh\n",
-            "",
-            0,
-            call_signal,
-            clean_env_vars,
-        );
-
-        fn call_signal() {
-            File::create("create_file.sh")
-                .unwrap()
-                .write_all(
-                    b"
-                        #!/bin/bash
-echo hello 
-touch text.txt
-sleep 3
-echo bye 
-
-                    ",
-                )
-                .unwrap();
-            // Start the `make` command
-            let mut child = Command::new("make")
-                .args(&[
-                    "-f",
-                    "tests/makefiles/special_targets/precious/basic_precious.mk",
-                ])
-                .stdout(Stdio::piped())
-                .spawn()
-                .expect("Failed to start `make`");
-
-            // Wait for a bit to ensure the `sleep` in `create_file.sh` is running
-            thread::sleep(Duration::from_secs(1));
-
-            // Send SIGINT to the `make` process using libc
-            let pid = child.id() as i32;
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(100));
             unsafe {
                 kill(pid, SIGINT);
             }
+        });
 
-            // Wait for the child process to exit
-            let _ = child.wait().expect("Failed to wait on child process");
-        }
+        let output = child.wait_with_output().expect("failed to wait for child");
 
-        fn clean_env_vars() {
-            // Implement any necessary environment cleanup here
-        }
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert_eq!(stdout, "echo hello\nhello\ntouch some.txt\nsleep 1\n");
+
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert_eq!(stderr, "make: Interrupt\n");
+
+        assert_eq!(output.status.code(), Some(130));
+
+        fs::remove_file("some.txt").unwrap();
     }
 
     #[test]
