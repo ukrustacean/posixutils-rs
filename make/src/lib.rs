@@ -12,6 +12,8 @@ pub mod error_code;
 pub mod rule;
 pub mod signal_handler;
 pub mod special_target;
+pub mod parser;
+
 
 use std::{
     collections::HashSet,
@@ -19,7 +21,7 @@ use std::{
     time::SystemTime,
 };
 
-use makefile_lossless::{Makefile, VariableDefinition};
+use parser::{Makefile, VariableDefinition};
 
 use config::Config;
 use error_code::ErrorCode::{self, *};

@@ -21,11 +21,11 @@ use std::{
 use clap::Parser;
 use const_format::formatcp;
 use gettextrs::{bind_textdomain_codeset, textdomain};
-use makefile_lossless::Makefile;
 use plib::PROJECT_NAME;
 use posixutils_make::{
     config::Config,
     error_code::ErrorCode::{self, *},
+    parser::{parse::ParseError, Makefile},
     Make,
 };
 
@@ -40,8 +40,12 @@ const MAKEFILE_PATH: [&str; 2] = [
 struct Args {
     #[arg(short = 'C', long, help = "Change to DIRECTORY before doing anything")]
     directory: Option<PathBuf>,
-    
-    #[arg(short = 'S', long, help = "Terminate make if error occurs. Default behavior")]
+
+    #[arg(
+        short = 'S',
+        long,
+        help = "Terminate make if error occurs. Default behavior"
+    )]
     terminate: bool,
 
     #[arg(short = 'f', long, help = "Path to the makefile to parse")]
@@ -256,7 +260,9 @@ fn parse_makefile(path: Option<impl AsRef<Path>>) -> Result<Makefile, ErrorCode>
 
     match Makefile::from_str(&contents) {
         Ok(makefile) => Ok(makefile),
-        Err(err) => Err(ParseError(err.to_string())),
+        Err(err) => Err(ErrorCode::ParserError {
+            constraint: ParseError::from(err),
+        }),
     }
 }
 

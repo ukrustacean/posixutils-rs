@@ -13,7 +13,7 @@ libc.workspace = true
 gettext-rs.workspace = true
 
 const_format = "0.2"
-makefile-lossless = "0.1"
+rowan = "0.15.16"
 
 [[bin]]
 name = "make"

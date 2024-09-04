@@ -24,10 +24,11 @@ use std::{
 use crate::{
     config::Config as GlobalConfig,
     error_code::ErrorCode::{self, *},
+    parser::{Rule as ParsedRule, VariableDefinition},
     signal_handler, DEFAULT_SHELL, DEFAULT_SHELL_VAR,
 };
+
 use config::Config;
-use makefile_lossless::{Rule as ParsedRule, VariableDefinition};
 use prerequisite::Prerequisite;
 use recipe::config::Config as RecipeConfig;
 use recipe::Recipe;

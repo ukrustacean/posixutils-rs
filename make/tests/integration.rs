@@ -241,16 +241,16 @@ mod arguments {
 
 // such tests should be moved directly to the package responsible for parsing makefiles
 mod parsing {
+
     use super::*;
 
     #[test]
-    #[ignore]
     fn empty() {
         run_test_helper(
             &["-f", "tests/makefiles/parsing/empty.mk"],
             "",
-            "make: parse error: No Targets",
-            ErrorCode::ParseError("the inner value does not matter for now".into()).into(),
+            "make: parse error:  *** No targets. Stop.\n\n",
+            4,
         );
     }
 
@@ -264,16 +264,16 @@ mod parsing {
         );
     }
 
-    #[test]
-    #[ignore]
-    fn suffixes_with_no_target() {
-        run_test_helper(
-            &["-f", "tests/makefiles/parsing/suffixes_with_no_targets.mk"],
-            "",
-            "make: parse error: No Targets",
-            ErrorCode::ParseError("no targets".into()).into(),
-        );
-    }
+    // #[test]
+    // #[ignore]
+    // fn suffixes_with_no_target() {
+    //     run_test_helper(
+    //         &["-f", "tests/makefiles/parsing/suffixes_with_no_targets.mk"],
+    //         "",
+    //         "make: parse error: No Targets",
+    //         ErrorCode::ParseError("no targets".into()).into(),
+    //     );
+    // }
 }
 
 mod io {
@@ -659,19 +659,19 @@ mod special_targets {
     }
 
     // unspecified stderr and error type, must be refactored and improved
-    #[test]
-    #[ignore]
-    fn clear_suffixes() {
-        run_test_helper(
-            &[
-                "-f",
-                "tests/makefiles/special_targets/suffixes/clear_suffixes.mk",
-            ],
-            "Converting $< to \n",
-            "make: Nothing be dobe for copied.out",
-            ErrorCode::ParseError("the inner value does not matter for now".into()).into(),
-        );
-    }
+    // #[test]
+    // #[ignore]
+    // fn clear_suffixes() {
+    //     run_test_helper(
+    //         &[
+    //             "-f",
+    //             "tests/makefiles/special_targets/suffixes/clear_suffixes.mk",
+    //         ],
+    //         "Converting $< to \n",
+    //         "make: Nothing be dobe for copied.out",
+    //         ErrorCode::ParseError("the inner value does not matter for now".into()).into(),
+    //     );
+    // }
 
     mod validations {
         use super::*;
