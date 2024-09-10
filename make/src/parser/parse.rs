@@ -78,7 +78,7 @@ use rowan::GreenNode;
 /// is helpful for top-down parsers: it maintains a stack
 /// of currently in-progress nodes
 use rowan::GreenNodeBuilder;
-
+use crate::parser::preprocessor::preprocess;
 use super::SyntaxKind;
 
 /// The parse results are stored as a "green tree".
@@ -527,7 +527,9 @@ impl FromStr for Makefile {
     type Err = ParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let parsed = parse(s);
+        let processed = preprocess(s);
+        let parsed = parse(&processed);
+
         if parsed.errors.is_empty() {
             Ok(parsed.root().clone_for_update())
         } else {
