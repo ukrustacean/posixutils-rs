@@ -4,8 +4,9 @@ use std::iter::Peekable;
 struct Preprocessor;
 
 fn skip_blank(letters: &mut Peekable<impl Iterator<Item = char>>) {
-    // TODO: Remove unwrap
-    while letters.peek().unwrap().is_whitespace() {
+    loop {
+        let Some(letter) = letters.peek() else { break };
+        if !letter.is_whitespace() { break };
         letters.next();
     }
 }
@@ -17,9 +18,11 @@ fn get_ident(letters: &mut Peekable<impl Iterator<Item = char>>) -> String {
     let mut ident = String::with_capacity(10);
 
     // TODO: Remove unwrap
-    while suitable_ident(letters.peek().unwrap()) {
-        let Some(letter) = letters.next() else { continue };
-        ident.push(letter);
+    loop {
+        let Some(letter) = letters.peek() else { break };
+        if !suitable_ident(letter) { break };
+        println!("{letter}");
+        ident.push(letters.next().unwrap());
     }
 
     ident
@@ -29,7 +32,7 @@ fn take_till_newline(letters: &mut Peekable<impl Iterator<Item = char>>) -> Stri
     let mut content = String::with_capacity(20);
 
     while !matches!(letters.peek(), Some('\n') | Some('#')) {
-        let Some(letter) = letters.next() else { continue };
+        let Some(letter) = letters.next() else { break };
         content.push(letter);
     }
 
@@ -45,7 +48,7 @@ fn generate_macro_table(source: &str) -> HashMap<String, String> {
 
         let macro_name = get_ident(&mut text);
         skip_blank(&mut text);
-        if text.next().unwrap() != '=' { panic!("Expected `equals` sign after the macro name `{}`", macro_name) }
+        let Some('=') = text.next() else { panic!("Expected `equals` sign after the macro name `{}`", macro_name) };
         skip_blank(&mut text);
         let macro_body = take_till_newline(&mut text);
 
@@ -56,36 +59,57 @@ fn generate_macro_table(source: &str) -> HashMap<String, String> {
 }
 
 pub fn preprocess(source: &str) -> String {
-    let mut result = String::with_capacity(source.len());
-    let table = generate_macro_table(source);
-
-    let mut letters = source.char_indices().peekable();
-    let mut prev_idx = 0;
+    let mut source = source.to_string();
+    
     loop {
-        let Some((idx, letter)) = letters.next() else { break };
-        if letter != '$' { continue; }
+        let mut substitutions = 0;
+        let mut result = String::with_capacity(source.len());
+        let table = generate_macro_table(&source);
 
-        result.push_str(&source[0..idx]);
-        prev_idx = idx + 1;
+        let mut letters = source.chars().peekable();
+        loop {
+            let Some(letter) = letters.next() else { break };
+            if letter != '$' {
+                result.push(letter);
+                continue;
+            }
 
-        let Some((idx, letter)) = letters.next() else { break };
-        if letter != '$' { continue; }
+            // TODO: Make proper error handling
+            let Some(letter) = letters.next() else { panic!("Unexpected EOF after `$` symbol"); };
+            match letter {
+                // Internal macros - we leave them "as is"
+                // yet as they will be dealt with in the
+                // parsing stage with more context available  
+                c @ ('$' | '@' | '%' | '?' | '<' | '*') => {
+                    result.push('$');
+                    result.push(c);
+                    continue;
+                }
+                c if suitable_ident(&c) => {
+                    // TODO: Make proper error handling
+                    let Some(macro_body) = table.get(&c.to_string()) else { panic!("Undefined macro `{}`", c) };
+                    result.push_str(macro_body);
+                    substitutions += 1;
+                    continue;
+                }
+                '(' | '{' => {
+                    skip_blank(&mut letters);
+                    let macro_name = get_ident(&mut letters);
+                    skip_blank(&mut letters);
+                    let Some(finilizer) = letters.next() else { panic!("Unexpected EOF at the end of macro expansion") };
+                    if !matches!(finilizer, ')' | '}') { panic!("Unexpected `{}` at the end of macro expansion", finilizer) }
 
-        if suitable_ident(&letter) { todo!("Sigle-char macros") }
-        if !matches!(letter, '(' | '{') { todo!("Special-case macros") }
+                    let Some(macro_body) = table.get(&macro_name) else { panic!("Undefined macro `{}`", macro_name) };
+                    result.push_str(macro_body);
+                    substitutions += 1;
 
-        skip_blank(&mut letters);
-        let name = get_ident(&mut letters);
-        skip_blank(&mut letters);
+                    continue;
+                }
+                // TODO: Make proper error handling
+                c => { panic!("Unexpected `{}` after `$` symbol", c); }
+            }
+        }
 
-        let Some((idx, letter)) = letters.next() else { break };
-        if !matches!(letter, ')' | '}') { panic!("Expected closed parenthesis or braces") }
-
-        prev_idx = idx + 1;
-
-        let Some(macro_body) = table.get(&name);
-        result.push_str(macro_body);
+        if substitutions == 0 { break result; } else { source = result; }
     }
-
-    result
 }
