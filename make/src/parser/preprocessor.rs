@@ -3,11 +3,8 @@ use std::iter::Peekable;
 use crate::parser::parse::Parse;
 use crate::parser::SyntaxKind;
 
-struct Preprocessor;
-
 fn skip_blank(letters: &mut Peekable<impl Iterator<Item = char>>) {
-    loop {
-        let Some(letter) = letters.peek() else { break };
+    while let Some(letter) = letters.peek() {
         if !letter.is_whitespace() { break };
         letters.next();
     }
@@ -16,33 +13,31 @@ fn skip_blank(letters: &mut Peekable<impl Iterator<Item = char>>) {
 fn suitable_ident(c: &char) -> bool { c.is_alphanumeric() || matches!(c, '_' | '.') }
 
 fn get_ident(letters: &mut Peekable<impl Iterator<Item = char>>) -> String {
-
-    let mut ident = String::with_capacity(10);
-
-    // TODO: Remove unwrap
-    loop {
-        let Some(letter) = letters.peek() else { break };
+    let mut ident = String::new();
+    
+    while let Some(letter) = letters.peek() {
         if !suitable_ident(letter) { break };
-        println!("{letter}");
-        ident.push(letters.next().unwrap());
+        ident.push(letter.clone());
+        letters.next();
     }
 
     ident
 }
 
-fn take_till_newline(letters: &mut Peekable<impl Iterator<Item = char>>) -> String {
-    let mut content = String::with_capacity(20);
-
-    while !matches!(letters.peek(), Some('\n') | Some('#')) {
-        let Some(letter) = letters.next() else { break };
-        content.push(letter);
+fn take_till_eol(letters: &mut Peekable<impl Iterator<Item = char>>) -> String {
+    let mut content = String::new();
+    
+    while let Some(letter) = letters.peek() {
+        if matches!(letter, '\n' | '#') { break };
+        content.push(letter.clone());
+        letters.next();
     }
 
     content
 }
 
 fn generate_macro_table(source: &str) -> HashMap<String, String> {
-    let macro_defs = source.lines().filter(|line| line.contains("="));
+    let macro_defs = source.lines().filter(|line| line.contains('='));
     let mut macro_table = HashMap::<String, String>::new();
 
     for def in macro_defs {
@@ -51,7 +46,7 @@ fn generate_macro_table(source: &str) -> HashMap<String, String> {
 
         let macro_name = get_ident(&mut text);
         skip_blank(&mut text);
-        let Some(symbol) = text.next() else { continue };
+        let Some(symbol) = text.next() else { panic!("Unexpected end of line!") };
         match symbol { 
             '=' => {}
             ':' => {
@@ -61,7 +56,7 @@ fn generate_macro_table(source: &str) -> HashMap<String, String> {
             c => panic!("Unexpected symbol `{}` in macro definition", c)
         };
         skip_blank(&mut text);
-        let macro_body = take_till_newline(&mut text);
+        let macro_body = take_till_eol(&mut text);
 
         macro_table.insert(macro_name, if immediate { substitute(&macro_body, &macro_table).0 } else { macro_body });
     }
@@ -123,21 +118,8 @@ pub fn preprocess(source: &str) -> String {
     let mut source = source.to_string();
     let table = generate_macro_table(&source);
     
-    
     loop {
         let (result, substitutions) = substitute(&source, &table);
         if substitutions == 0 { break result } else { source = result }
     }
-}
-
-pub fn postprocess(mut parse: Parse) -> Parse {
-    let mut queue = VecDeque::new();
-    queue.push_back(parse.syntax());
-    
-    while let Some(node) = queue.pop_front() {
-        println!("{:?}: {}", node.kind(), node.text());
-        node.children().for_each(|child| queue.push_back(child));
-    }
-    
-    parse
 }
