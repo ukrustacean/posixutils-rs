@@ -1,7 +1,35 @@
-use crate::parser::parse::Parse;
-use crate::parser::SyntaxKind;
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
+use std::fmt::{Debug, Display, Formatter};
 use std::iter::Peekable;
+
+#[derive(Debug)]
+struct PreprocessorError(String);
+
+impl Display for PreprocessorError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl std::error::Error for PreprocessorError {}
+
+#[derive(Debug)]
+struct PreprocessorErrorCollection(Vec<String>);
+
+impl Display for PreprocessorErrorCollection {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        for s in self.0 { writeln!(f, "{}", s)?; }
+        Ok(())
+    }
+}
+
+impl std::error::Error for PreprocessorErrorCollection {}
+
+macro_rules! error {
+    ($($tt:tt)+,) => { Err(PreprocessorError(format!($($tt)+))) };
+}
+
+type Result<T> = std::result::Result<T, PreprocessorError>;
 
 fn skip_blank(letters: &mut Peekable<impl Iterator<Item = char>>) {
     while let Some(letter) = letters.peek() {
@@ -16,7 +44,7 @@ fn suitable_ident(c: &char) -> bool {
     c.is_alphanumeric() || matches!(c, '_' | '.')
 }
 
-fn get_ident(letters: &mut Peekable<impl Iterator<Item = char>>) -> String {
+fn get_ident(letters: &mut Peekable<impl Iterator<Item = char>>) -> Result<String> {
     let mut ident = String::new();
 
     while let Some(letter) = letters.peek() {
@@ -27,7 +55,7 @@ fn get_ident(letters: &mut Peekable<impl Iterator<Item = char>>) -> String {
         letters.next();
     }
 
-    ident
+    if ident.is_empty() { error!("Empty ident") } else { Ok(ident) }
 }
 
 fn take_till_eol(letters: &mut Peekable<impl Iterator<Item = char>>) -> String {
@@ -44,28 +72,28 @@ fn take_till_eol(letters: &mut Peekable<impl Iterator<Item = char>>) -> String {
     content
 }
 
-fn generate_macro_table(source: &str) -> HashMap<String, String> {
+fn generate_macro_table(source: &str) -> Result<HashMap<String, String>> {
     let macro_defs = source.lines().filter(|line| line.contains('='));
     let mut macro_table = HashMap::<String, String>::new();
 
-    for def in macro_defs {
+    let _x = macro_defs.map(|def| {
         let mut immediate = false;
         let mut text = def.chars().peekable();
 
-        let macro_name = get_ident(&mut text);
+        let macro_name = get_ident(&mut text)?;
         skip_blank(&mut text);
         let Some(symbol) = text.next() else {
-            panic!("Unexpected end of line!")
+            error!("Unexpected end of line!")
         };
         match symbol {
             '=' => {}
             ':' => {
                 let Some('=') = text.next() else {
-                    panic!("Expected `=` after `:` in macro definition")
+                    error!("Expected `=` after `:` in macro definition")
                 };
                 immediate = true;
             }
-            c => panic!("Unexpected symbol `{}` in macro definition", c),
+            c => error!("Unexpected symbol `{}` in macro definition", c),
         };
         skip_blank(&mut text);
         let macro_body = take_till_eol(&mut text);
@@ -78,9 +106,11 @@ fn generate_macro_table(source: &str) -> HashMap<String, String> {
                 macro_body
             },
         );
-    }
+        
+        Ok(())
+    }).filter(Result::is_err).collect::<Vec<_>>();
 
-    macro_table
+    Ok(macro_table)
 }
 
 fn substitute(source: &str, table: &HashMap<String, String>) -> (String, u32) {
