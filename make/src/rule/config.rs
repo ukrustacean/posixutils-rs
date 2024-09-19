@@ -18,7 +18,6 @@ pub struct Config {
     pub phony: bool,
     /// Whether rule includes precious targets
     pub precious: bool,
-
 }
 
 #[allow(clippy::derivable_impls)]

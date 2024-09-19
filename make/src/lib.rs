@@ -9,11 +9,10 @@
 
 pub mod config;
 pub mod error_code;
+pub mod parser;
 pub mod rule;
 pub mod signal_handler;
 pub mod special_target;
-pub mod parser;
-
 
 use std::{
     collections::HashSet,
@@ -33,7 +32,6 @@ const DEFAULT_SHELL_VAR: &str = "SHELL";
 
 /// The default shell to use for running recipes. Linux and MacOS
 const DEFAULT_SHELL: &str = "/bin/sh";
-
 
 /// Represents the make utility with its data and configuration.
 ///
@@ -194,7 +192,6 @@ impl TryFrom<(Makefile, Config)> for Make {
                 return Err(NoTarget { target: None });
             };
 
-
             if SpecialTarget::try_from(target.clone()).is_ok() {
                 special_rules.push(rule);
             } else {
@@ -212,7 +209,6 @@ impl TryFrom<(Makefile, Config)> for Make {
         for rule in special_rules {
             special_target::process(rule, &mut make)?;
         }
-
 
         Ok(make)
     }

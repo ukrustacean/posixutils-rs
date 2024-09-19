@@ -35,7 +35,6 @@ pub struct Config {
     /// Whether to not delete interrupted files on async events.
     pub precious: bool,
 
-
     pub rules: BTreeMap<String, BTreeSet<String>>,
 }
 
