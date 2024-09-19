@@ -3,33 +3,30 @@ use std::fmt::{Debug, Display, Formatter};
 use std::iter::Peekable;
 
 #[derive(Debug)]
-struct PreprocessorError(String);
+struct PreprocError(Vec<String>);
 
-impl Display for PreprocessorError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.0)
+impl PreprocError {
+    fn join(self, other: Self) -> Self {
+        let mut errors = self.0;
+        errors.extend(other.0);
+        Self(errors)
     }
 }
 
-impl std::error::Error for PreprocessorError {}
-
-#[derive(Debug)]
-struct PreprocessorErrorCollection(Vec<String>);
-
-impl Display for PreprocessorErrorCollection {
+impl Display for PreprocError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         for s in self.0 { writeln!(f, "{}", s)?; }
         Ok(())
     }
 }
 
-impl std::error::Error for PreprocessorErrorCollection {}
+impl std::error::Error for PreprocError {}
 
 macro_rules! error {
-    ($($tt:tt)+,) => { Err(PreprocessorError(format!($($tt)+))) };
+    ($($e:expr),+) => { Err(PreprocessorError(vec![format!($($e),+)])) };
 }
 
-type Result<T> = std::result::Result<T, PreprocessorError>;
+type Result<T> = std::result::Result<T, PreprocError>;
 
 fn skip_blank(letters: &mut Peekable<impl Iterator<Item = char>>) {
     while let Some(letter) = letters.peek() {
@@ -72,11 +69,11 @@ fn take_till_eol(letters: &mut Peekable<impl Iterator<Item = char>>) -> String {
     content
 }
 
-fn generate_macro_table(source: &str) -> Result<HashMap<String, String>> {
+fn generate_macro_table(source: &str) -> std::result::Result<HashMap<String, String>, PreprocError> {
     let macro_defs = source.lines().filter(|line| line.contains('='));
     let mut macro_table = HashMap::<String, String>::new();
 
-    let _x = macro_defs.map(|def| {
+    let errors = macro_defs.map(|def| -> Result<()> {
         let mut immediate = false;
         let mut text = def.chars().peekable();
 
@@ -89,33 +86,37 @@ fn generate_macro_table(source: &str) -> Result<HashMap<String, String>> {
             '=' => {}
             ':' => {
                 let Some('=') = text.next() else {
-                    error!("Expected `=` after `:` in macro definition")
+                    error!("Expected `=` after `:` in macro definition")?
                 };
                 immediate = true;
             }
-            c => error!("Unexpected symbol `{}` in macro definition", c),
+            c => error!("Unexpected symbol `{}` in macro definition", c)?,
         };
         skip_blank(&mut text);
-        let macro_body = take_till_eol(&mut text);
+        let mut macro_body = take_till_eol(&mut text);
 
         macro_table.insert(
             macro_name,
             if immediate {
-                substitute(&macro_body, &macro_table).0
+                loop {
+                    let (result, substitutions) = substitute(&macro_body, &macro_table)?;
+                    if substitutions == 0 { break result } else { macro_body = result }
+                }
             } else {
                 macro_body
             },
         );
         
         Ok(())
-    }).filter(Result::is_err).collect::<Vec<_>>();
+    }).filter_map(|x| if let Err(error) = x { Some(error.0) } else { None }).flatten().collect::<Vec<_>>();
 
-    Ok(macro_table)
+    if errors.is_empty() { Ok(macro_table) } else { Err(PreprocError(errors)) }
 }
 
-fn substitute(source: &str, table: &HashMap<String, String>) -> (String, u32) {
+fn substitute(source: &str, table: &HashMap<String, String>) -> Result<(String, u32)> {
     let mut substitutions = 0;
     let mut result = String::with_capacity(source.len());
+    let mut errors = PreprocError(vec![]);
 
     let mut letters = source.chars().peekable();
     while let Some(letter) = letters.next() {
@@ -126,7 +127,8 @@ fn substitute(source: &str, table: &HashMap<String, String>) -> (String, u32) {
 
         // TODO: Make proper error handling
         let Some(letter) = letters.next() else {
-            panic!("Unexpected EOF after `$` symbol");
+            errors.0.push("Unexpected EOF after `$` symbol".to_string());
+            continue
         };
         match letter {
             // Internal macros - we leave them "as is"
@@ -138,9 +140,9 @@ fn substitute(source: &str, table: &HashMap<String, String>) -> (String, u32) {
                 continue;
             }
             c if suitable_ident(&c) => {
-                // TODO: Make proper error handling
                 let Some(macro_body) = table.get(&c.to_string()) else {
-                    panic!("Undefined macro `{}`", c)
+                    errors.0.push(format!("Undefined macro `{}`", c));
+                    continue;
                 };
                 result.push_str(macro_body);
                 substitutions += 1;
@@ -148,17 +150,23 @@ fn substitute(source: &str, table: &HashMap<String, String>) -> (String, u32) {
             }
             '(' | '{' => {
                 skip_blank(&mut letters);
-                let macro_name = get_ident(&mut letters);
+                let Ok(macro_name) = get_ident(&mut letters) else {
+                    errors.0.push("Could not get a macro name".to_string());
+                    continue;
+                };
                 skip_blank(&mut letters);
                 let Some(finilizer) = letters.next() else {
-                    panic!("Unexpected EOF at the end of macro expansion")
+                    errors.0.push("Unexpected EOF at the end of macro expansion".to_string());
+                    continue;
                 };
                 if !matches!(finilizer, ')' | '}') {
-                    panic!("Unexpected `{}` at the end of macro expansion", finilizer)
+                    errors.0.push(format!("Unexpected `{}` at the end of macro expansion", finilizer));
+                    continue;
                 }
 
                 let Some(macro_body) = table.get(&macro_name) else {
-                    panic!("Undefined macro `{}`", macro_name)
+                    errors.0.push(format!("Undefined macro `{}`", macro_name));
+                    continue;
                 };
                 result.push_str(macro_body);
                 substitutions += 1;
@@ -172,17 +180,17 @@ fn substitute(source: &str, table: &HashMap<String, String>) -> (String, u32) {
         }
     }
 
-    (result, substitutions)
+    if errors.0.is_empty() { Ok((result, substitutions)) } else { Err(errors) }
 }
 
-pub fn preprocess(source: &str) -> String {
+pub fn preprocess(source: &str) -> Result<String> {
     let mut source = source.to_string();
-    let table = generate_macro_table(&source);
+    let table = generate_macro_table(&source)?;
 
     loop {
-        let (result, substitutions) = substitute(&source, &table);
+        let (result, substitutions) = substitute(&source, &table)?;
         if substitutions == 0 {
-            break result;
+            break Ok(result);
         } else {
             source = result
         }
