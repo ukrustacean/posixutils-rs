@@ -74,6 +74,16 @@ fn generate_macro_table(source: &str) -> std::result::Result<HashMap<String, Str
     let mut macro_table = HashMap::<String, String>::new();
 
     let errors = macro_defs.map(|def| -> Result<()> {
+        enum Operator {
+            Equals,
+            Colon,
+            Colon2,
+            Colon3,
+            Bang,
+            QuestionMark,
+            Plus
+        }
+
         let mut immediate = false;
         let mut text = def.chars().peekable();
 
@@ -82,33 +92,66 @@ fn generate_macro_table(source: &str) -> std::result::Result<HashMap<String, Str
         let Some(symbol) = text.next() else {
             error!("Unexpected end of line!")
         };
-        match symbol {
-            '=' => {}
+        let operator = match symbol {
+            '=' => { Operator::Equals }
             ':' => {
+                let mut count = 1;
+                while let Some(':') = text.peek() { count += 1; text.next(); }
                 let Some('=') = text.next() else {
                     error!("Expected `=` after `:` in macro definition")?
                 };
+
                 immediate = true;
+                match count {
+                    1 => Operator::Colon,
+                    2 => Operator::Colon2,
+                    3 => Operator::Colon3,
+                    _ => error!("Too many columns for assignment operator!")?
+                }
             }
+            '!' => { Operator::Bang }
+            '?' => { Operator::QuestionMark }
+            '+' => { Operator::Plus }
             c => error!("Unexpected symbol `{}` in macro definition", c)?,
         };
         skip_blank(&mut text);
         let mut macro_body = take_till_eol(&mut text);
 
-        macro_table.insert(
-            macro_name,
-            if immediate {
+        match operator {
+            Operator::Equals => {}
+            Operator::Colon | Operator::Colon2 => {
                 loop {
                     let (result, substitutions) = substitute(&macro_body, &macro_table)?;
-                    if substitutions == 0 { break result } else { macro_body = result }
+                    if substitutions == 0 { break } else { macro_body = result }
+                };
+            }
+            Operator::Colon3 => {
+                macro_body = substitute(&macro_body, &macro_table)?.0;
+            }
+            Operator::Bang => {
+                macro_body = substitute(&macro_body, &macro_table)?.0;
+                let mut command = macro_body.split_whitespace();
+                let Some(executable) = command.next() else { error!("No command found for calling after macro expansion")? };
+                let Ok(result) = std::process::Command::new(executable).args(command).output() else { error!("Command execution failed")? };
+                macro_body = String::from_utf8_lossy(&result.stdout).to_string();
+            }
+            Operator::QuestionMark => {
+                if let Some(body) = macro_table.remove(&macro_name) {
+                    macro_body = body
                 }
-            } else {
-                macro_body
-            },
-        );
+            }
+            Operator::Plus => {
+                if let Some(body) = macro_table.remove(&macro_name) {
+                    macro_body = format!("{} {}", body, macro_body);
+                }
+            }
+        }
+
+        macro_table.insert(macro_name, macro_body);
         
         Ok(())
-    }).filter_map(|x| if let Err(error) = x { Some(error.0) } else { None }).flatten().collect::<Vec<_>>();
+    }).filter_map(|x| if let Err(error) = x { Some(error.0) } else { None })
+      .flatten().collect::<Vec<_>>();
 
     if errors.is_empty() { Ok(macro_table) } else { Err(PreprocError(errors)) }
 }
