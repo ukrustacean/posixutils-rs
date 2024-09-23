@@ -109,9 +109,24 @@ fn generate_macro_table(source: &str) -> std::result::Result<HashMap<String, Str
                     _ => error!("Too many columns for assignment operator!")?
                 }
             }
-            '!' => { Operator::Bang }
-            '?' => { Operator::QuestionMark }
-            '+' => { Operator::Plus }
+            '!' => {
+                let Some('=') = text.next() else {
+                    error!("Expected `=` after `!` in macro definition")?
+                };
+                Operator::Bang
+            }
+            '?' => {
+                let Some('=') = text.next() else {
+                    error!("Expected `=` after `?` in macro definition")?
+                };
+                Operator::QuestionMark
+            }
+            '+' => {
+                let Some('=') = text.next() else {
+                    error!("Expected `=` after `+` in macro definition")?
+                };
+                Operator::Plus
+            }
             c => error!("Unexpected symbol `{}` in macro definition", c)?,
         };
         skip_blank(&mut text);
