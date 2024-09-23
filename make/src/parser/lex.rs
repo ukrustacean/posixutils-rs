@@ -1,6 +1,6 @@
 use std::iter::Peekable;
 use std::str::Chars;
-
+use rowan::SyntaxKind;
 use super::SyntaxKind;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -124,6 +124,9 @@ impl<'a> Lexer<'a> {
                     '"' => {
                         self.input.next();
                         Some((SyntaxKind::QUOTE, "\"".to_string()))
+                    }
+                    c @ ('^' | '%' | '@' | '*' | '<') => {
+                        Some((SyntaxKind::MACRO_OP, c.to_string()))
                     }
                     _ => {
                         self.input.next();

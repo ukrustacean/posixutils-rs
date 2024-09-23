@@ -198,6 +198,13 @@ pub fn parse(text: &str) -> Parse {
             self.builder.finish_node();
         }
 
+        fn parse_macro(&mut self) {
+            self.builder.start_node(MACRO.into());
+            self.expect(DOLLAR);
+            self.expect(MACRO_OP);
+            self.builder.finish_node();
+        }
+
         fn parse(mut self) -> Parse {
             self.builder.start_node(ROOT.into());
             loop {
@@ -527,7 +534,7 @@ impl FromStr for Makefile {
     type Err = ParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let processed = preprocess(s);
+        let processed = preprocess(s).map_err(|e| ParseError(e.0))?;
         let parsed = parse(&processed);
 
         if parsed.errors.is_empty() {

@@ -43,6 +43,9 @@ pub enum SyntaxKind {
     // include other makefiles
     INCLUDE,
     EXPR,
+
+    MACRO,
+    MACRO_OP,
 }
 
 /// Convert our `SyntaxKind` into the rowan `SyntaxKind`.

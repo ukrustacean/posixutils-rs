@@ -3,7 +3,7 @@ use std::fmt::{Debug, Display, Formatter};
 use std::iter::Peekable;
 
 #[derive(Debug)]
-struct PreprocError(Vec<String>);
+pub struct PreprocError(pub Vec<String>);
 
 impl PreprocError {
     fn join(self, other: Self) -> Self {
