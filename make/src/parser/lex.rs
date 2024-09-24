@@ -1,6 +1,5 @@
 use std::iter::Peekable;
 use std::str::Chars;
-use rowan::SyntaxKind;
 use super::SyntaxKind;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -97,10 +96,22 @@ impl<'a> Lexer<'a> {
                         SyntaxKind::IDENTIFIER,
                         self.read_while(Self::is_valid_identifier_char),
                     )),
-                    ':' | '=' | '?' | '+' => Some((
-                        SyntaxKind::OPERATOR,
-                        self.read_while(|c| c == ':' || c == '=' || c == '?'),
-                    )),
+                    '+' => {
+                        self.input.next();
+                        Some((SyntaxKind::PLUS, "+".to_string()))
+                    },
+                    '?' => {
+                        self.input.next();
+                        Some((SyntaxKind::QUESTION, "?".to_string()))
+                    }
+                    ':' => {
+                        self.input.next();
+                        Some((SyntaxKind::COLON, ":".to_string()))
+                    }
+                    '=' => {
+                        self.input.next();
+                        Some((SyntaxKind::EQUALS, "=".to_string()))
+                    }
                     '(' => {
                         self.input.next();
                         Some((SyntaxKind::LPAREN, "(".to_string()))
@@ -108,6 +119,14 @@ impl<'a> Lexer<'a> {
                     ')' => {
                         self.input.next();
                         Some((SyntaxKind::RPAREN, ")".to_string()))
+                    }
+                    '{' => {
+                        self.input.next();
+                        Some((SyntaxKind::LBRACE, "{".to_string()))
+                    }
+                    '}' => {
+                        self.input.next();
+                        Some((SyntaxKind::RBRACE, "}".to_string()))
                     }
                     '$' => {
                         self.input.next();
@@ -123,12 +142,33 @@ impl<'a> Lexer<'a> {
                     }
                     '"' => {
                         self.input.next();
-                        Some((SyntaxKind::QUOTE, "\"".to_string()))
+                        Some((SyntaxKind::DOUBLE_QUOTE, "\"".to_string()))
                     }
-                    c @ ('^' | '%' | '@' | '*' | '<') => {
-                        Some((SyntaxKind::MACRO_OP, c.to_string()))
+                    '\'' => {
+                        self.input.next();
+                        Some((SyntaxKind::SINGLE_QUOTE, "'".to_string()))
                     }
-                    _ => {
+                    '^' => {
+                        self.input.next();
+                        Some((SyntaxKind::CARET, "^".to_string()))
+                    }
+                    '%' => {
+                        self.input.next();
+                        Some((SyntaxKind::PERCENT, "%".to_string()))
+                    }
+                    '@' => {
+                        self.input.next();
+                        Some((SyntaxKind::AT_SIGN, "@".to_string()))
+                    }
+                    '*' => {
+                        self.input.next();
+                        Some((SyntaxKind::STAR, "*".to_string()))
+                    }
+                    '<' => {
+                        self.input.next();
+                        Some((SyntaxKind::LESS, "<".to_string()))
+                    }
+                    c => {
                         self.input.next();
                         Some((SyntaxKind::ERROR, c.to_string()))
                     }

@@ -18,21 +18,34 @@ pub use parse::{Identifier, Makefile, Rule, VariableDefinition};
 #[allow(non_camel_case_types)]
 #[repr(u16)]
 pub enum SyntaxKind {
-    IDENTIFIER = 0,
-    INDENT,
-    TEXT,
+    // Simple single-char AST nodes
+    SINGLE_QUOTE = 0,
+    DOUBLE_QUOTE,
     WHITESPACE,
+    BACKSLASH,
+    QUESTION,
+    AT_SIGN,
     NEWLINE,
+    PERCENT,
+    EQUALS,
     DOLLAR,
     LPAREN,
     RPAREN,
-    QUOTE,
-    BACKSLASH,
+    LBRACE,
+    RBRACE,
+    COLON,
+    CARET,
     COMMA,
+    LESS,
+    PLUS,
+    STAR,
+    
+    IDENTIFIER,
     OPERATOR,
-
     COMMENT,
+    INDENT,
     ERROR,
+    TEXT,
 
     // composite nodes
     ROOT, // The entire file
