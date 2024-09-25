@@ -40,6 +40,21 @@ pub enum SyntaxKind {
     PLUS,
     STAR,
     
+    // Keywords
+    INCLUDE,
+    OVERRIDE,
+    EXPORT,
+    UNEXPORT,
+    IFDEF,
+    IFNDEF,
+    IFEQ,
+    IFNEQ,
+    ELSE,
+    ENDIF,
+    DEFINE,
+    ENDEF,
+    UNDEFINE,
+    
     IDENTIFIER,
     OPERATOR,
     COMMENT,
@@ -54,7 +69,6 @@ pub enum SyntaxKind {
     RECIPE,
     VARIABLE,
     // include other makefiles
-    INCLUDE,
     EXPR,
 
     MACRO,

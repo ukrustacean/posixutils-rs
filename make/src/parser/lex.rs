@@ -1,6 +1,31 @@
+use super::SyntaxKind;
+use std::collections::HashMap;
 use std::iter::Peekable;
 use std::str::Chars;
-use super::SyntaxKind;
+
+fn keywords() -> &'static HashMap<String, SyntaxKind> {
+    use std::sync::OnceLock;
+    use SyntaxKind::*;
+
+    static KEYWORDS: OnceLock<HashMap<String, SyntaxKind>> = OnceLock::new();
+    KEYWORDS.get_or_init(|| {
+        HashMap::from_iter([
+            ("include".to_string(), INCLUDE),
+            ("override".to_string(), OVERRIDE),
+            ("export".to_string(), EXPORT),
+            ("unexport".to_string(), UNEXPORT),
+            ("ifdef".to_string(), IFDEF),
+            ("ifndef".to_string(), IFNDEF),
+            ("ifeq".to_string(), IFEQ),
+            ("ifneq".to_string(), IFNEQ),
+            ("else".to_string(), ELSE),
+            ("endif".to_string(), ENDIF),
+            ("define".to_string(), DEFINE),
+            ("endef".to_string(), ENDEF),
+            ("undefine".to_string(), UNDEFINE),
+        ])
+    })
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum LineType {
@@ -92,14 +117,19 @@ impl<'a> Lexer<'a> {
                     c if Self::is_whitespace(c) => {
                         Some((SyntaxKind::WHITESPACE, self.read_while(Self::is_whitespace)))
                     }
-                    c if Self::is_valid_identifier_char(c) => Some((
-                        SyntaxKind::IDENTIFIER,
-                        self.read_while(Self::is_valid_identifier_char),
-                    )),
+                    c if Self::is_valid_identifier_char(c) => {
+                        let ident = self.read_while(Self::is_valid_identifier_char);
+
+                        if let Some(token) = keywords().get(&ident) {
+                            Some((*token, ident))
+                        } else {
+                            Some((SyntaxKind::IDENTIFIER, ident))
+                        }
+                    }
                     '+' => {
                         self.input.next();
                         Some((SyntaxKind::PLUS, "+".to_string()))
-                    },
+                    }
                     '?' => {
                         self.input.next();
                         Some((SyntaxKind::QUESTION, "?".to_string()))
