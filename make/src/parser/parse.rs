@@ -116,14 +116,11 @@ pub fn parse(text: &str) -> Parse {
             self.builder.start_node(EXPR.into());
             loop {
                 match self.current() {
-                    Some(NEWLINE) => {
+                    Some(NEWLINE) | None => {
                         break;
                     }
                     Some(_t) => {
                         self.bump();
-                    }
-                    None => {
-                        break;
                     }
                 }
             }
@@ -185,7 +182,7 @@ pub fn parse(text: &str) -> Parse {
         fn parse_assignment(&mut self) {
             self.builder.start_node(VARIABLE.into());
             self.skip_ws();
-            if self.tokens.last() == Some(&(IDENTIFIER, "export".to_string())) {
+            if self.tokens.last() == Some(&(EXPORT, "export".to_string())) {
                 self.expect(IDENTIFIER);
                 self.skip_ws();
             }
@@ -201,10 +198,22 @@ pub fn parse(text: &str) -> Parse {
         fn parse_macro(&mut self) {
             self.builder.start_node(MACRO.into());
             self.expect(DOLLAR);
-            self.expect(MACRO_OP);
+            
+            let signs = [DOLLAR, AT_SIGN, PERCENT, QUESTION, LESS, STAR];
+            let mut has_match = false;
+            
+            for sign in signs {
+                has_match = self.try_expect(sign);
+                if has_match { break }
+            }
+            
+            if !has_match {
+                self.error(format!("expected `$`, `@`, `%`, `?`, `<` or `*` macro, got {:?}", self.current()))
+            }
+            
             self.builder.finish_node();
         }
-
+        
         fn parse(mut self) -> Parse {
             self.builder.start_node(ROOT.into());
             loop {
@@ -277,6 +286,16 @@ pub fn parse(text: &str) -> Parse {
                 self.bump();
             }
         }
+
+        fn try_expect(&mut self, expected: SyntaxKind) -> bool {
+            if self.current() != Some(expected) {
+                false
+            } else {
+                self.bump();
+                true
+            }
+        }
+        
         fn skip_ws(&mut self) {
             while self.current() == Some(WHITESPACE) {
                 self.bump()
