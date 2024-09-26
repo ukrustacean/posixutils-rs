@@ -39,22 +39,24 @@ pub enum SyntaxKind {
     LESS,
     PLUS,
     STAR,
+    TAB,
     
     // Keywords
     INCLUDE,
-    OVERRIDE,
     EXPORT,
-    UNEXPORT,
-    IFDEF,
-    IFNDEF,
-    IFEQ,
-    IFNEQ,
-    ELSE,
-    ENDIF,
-    DEFINE,
-    ENDEF,
-    UNDEFINE,
-    
+    // This may be used as an extension to syntax
+    //   OVERRIDE,
+    //   UNEXPORT,
+    //   IFDEF,
+    //   IFNDEF,
+    //   IFEQ,
+    //   IFNEQ,
+    //   ELSE,
+    //   ENDIF,
+    //   DEFINE,
+    //   UNDEFINE,
+    //   ENDEF,
+
     IDENTIFIER,
     OPERATOR,
     COMMENT,
@@ -68,11 +70,8 @@ pub enum SyntaxKind {
     PREREQUISITES,
     RECIPE,
     VARIABLE,
-    // include other makefiles
     EXPR,
-
     MACRO,
-    MACRO_OP,
 }
 
 /// Convert our `SyntaxKind` into the rowan `SyntaxKind`.

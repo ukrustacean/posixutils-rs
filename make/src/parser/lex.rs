@@ -11,18 +11,7 @@ fn keywords() -> &'static HashMap<String, SyntaxKind> {
     KEYWORDS.get_or_init(|| {
         HashMap::from_iter([
             ("include".to_string(), INCLUDE),
-            ("override".to_string(), OVERRIDE),
             ("export".to_string(), EXPORT),
-            ("unexport".to_string(), UNEXPORT),
-            ("ifdef".to_string(), IFDEF),
-            ("ifndef".to_string(), IFNDEF),
-            ("ifeq".to_string(), IFEQ),
-            ("ifneq".to_string(), IFNEQ),
-            ("else".to_string(), ELSE),
-            ("endif".to_string(), ENDIF),
-            ("define".to_string(), DEFINE),
-            ("endef".to_string(), ENDEF),
-            ("undefine".to_string(), UNDEFINE),
         ])
     })
 }
