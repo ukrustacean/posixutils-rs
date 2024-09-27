@@ -155,7 +155,7 @@ impl Rule {
             if !silent {
                 println!("{}", recipe);
             }
-
+            
             let mut command = Command::new(
                 env::var(DEFAULT_SHELL_VAR)
                     .as_ref()
@@ -165,6 +165,8 @@ impl Rule {
 
             self.init_env(env_macros, &mut command, macros);
 
+            self.substitute_internal_macros(target, recipe);
+            
             command.args(["-c", recipe.as_ref()]);
 
             let status = match command.status() {
@@ -209,6 +211,46 @@ impl Rule {
         }
 
         Ok(())
+    }
+    
+    fn substitute_internal_macros(&self, target: &Target, recipe: &Recipe) -> Recipe {
+        let recipe = recipe.inner();
+        let mut stream = recipe.chars();
+        let mut result = String::new();
+        
+        while let Some(ch) = stream.next() {
+            if ch != '$' { result.push(ch); continue }
+            
+            // TODO: Remove panics
+            match stream.next() {
+                Some('@') => {
+                    result.push_str(&target
+                        .to_string()
+                        .split('(')
+                        .next()
+                        .expect("Target must have lib part")
+                        .to_string())
+                }
+                Some('%') => {
+                    let body = target
+                        .to_string()
+                        .split('(')
+                        .skip(1)
+                        .next()
+                        .expect("Target must have lib part")
+                        .to_string();
+                    
+                    result.push_str(body.strip_suffix(')').unwrap_or(&body))
+                }
+                Some('?') => { todo!("Pass rule prerequisites here") }
+                Some('$') => { result.push('$') }
+                Some('<' | '*') => { todo!("Implement when reference rules are ready") }
+                Some(_) => { break }
+                None => { panic!("Unexpected `$` at the end of the rule!") }
+            }
+        }
+
+        todo!()
     }
 
     /// A helper function to initialize env vars for shell commands.
