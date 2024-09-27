@@ -15,7 +15,7 @@ impl PreprocError {
 
 impl Display for PreprocError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        for s in self.0 { writeln!(f, "{}", s)?; }
+        for s in self.0.iter() { writeln!(f, "{}", s)?; }
         Ok(())
     }
 }
@@ -23,7 +23,7 @@ impl Display for PreprocError {
 impl std::error::Error for PreprocError {}
 
 macro_rules! error {
-    ($($e:expr),+) => { Err(PreprocessorError(vec![format!($($e),+)])) };
+    ($($e:expr),+) => { Err(PreprocError(vec![format!($($e),+)])) };
 }
 
 type Result<T> = std::result::Result<T, PreprocError>;
@@ -90,7 +90,7 @@ fn generate_macro_table(source: &str) -> std::result::Result<HashMap<String, Str
         let macro_name = get_ident(&mut text)?;
         skip_blank(&mut text);
         let Some(symbol) = text.next() else {
-            error!("Unexpected end of line!")
+            error!("Unexpected end of line!")?
         };
         let operator = match symbol {
             '=' => { Operator::Equals }
