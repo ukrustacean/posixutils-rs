@@ -26,6 +26,7 @@ use config::Config;
 use error_code::ErrorCode::{self, *};
 use rule::{prerequisite::Prerequisite, target::Target, Rule};
 use special_target::SpecialTarget;
+use crate::special_target::InferenceTarget;
 
 /// The default shell variable name.
 const DEFAULT_SHELL_VAR: &str = "SHELL";
@@ -39,6 +40,7 @@ const DEFAULT_SHELL: &str = "/bin/sh";
 pub struct Make {
     macros: Vec<VariableDefinition>,
     rules: Vec<Rule>,
+    inference_rules: Vec<Rule>,
     default_rule: Option<Rule>, // .DEFAULT
     pub config: Config,
 }
@@ -185,15 +187,19 @@ impl TryFrom<(Makefile, Config)> for Make {
     fn try_from((makefile, config): (Makefile, Config)) -> Result<Self, Self::Error> {
         let mut rules = vec![];
         let mut special_rules = vec![];
+        let mut inference_rules = vec![];
 
         for rule in makefile.rules() {
-            let rule = Rule::from(rule);
+            let mut rule = Rule::from(rule);
             let Some(target) = rule.targets().next() else {
                 return Err(NoTarget { target: None });
             };
 
             if SpecialTarget::try_from(target.clone()).is_ok() {
                 special_rules.push(rule);
+            } else if InferenceTarget::try_from(target.clone()).is_ok() {
+                rule.config.inference = true;
+                inference_rules.push(rule);
             } else {
                 rules.push(rule);
             }
@@ -201,6 +207,7 @@ impl TryFrom<(Makefile, Config)> for Make {
 
         let mut make = Self {
             rules,
+            inference_rules,
             macros: makefile.variable_definitions().collect(),
             default_rule: None,
             config,

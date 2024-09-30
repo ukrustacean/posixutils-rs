@@ -59,6 +59,16 @@ impl fmt::Display for SpecialTarget {
     }
 }
 
+pub struct InferenceTarget {
+    from: String,
+    to: String,
+}
+
+impl InferenceTarget {
+    pub fn from(&self) -> &str { self.from.as_ref() }
+    pub fn to(&self) -> &str { self.to.as_ref() }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Error {
     MustNotHavePrerequisites,
@@ -114,6 +124,37 @@ impl TryFrom<Target> for SpecialTarget {
             }
         }
         Err(ParseError)
+    }
+}
+
+impl TryFrom<Target> for InferenceTarget {
+    type Error = ParseError;
+
+    fn try_from(target: Target) -> Result<Self, Self::Error> {
+        let mut from = String::new();
+        let mut to = String::new();
+        
+        let mut source = target.as_ref().chars().peekable();
+        let Some('.') = source.next() else { Err(ParseError)? };
+        while let Some(c) = source.peek() {
+            match c {
+                c @ ('0'..='9' | 'a'..='z' | 'A'..='Z' | '_') => from.push(c.clone()),
+                '.' => break,
+                _ => Err(ParseError)?,
+            }
+            source.next();
+        }
+        let Some('.') = source.next() else { Err(ParseError)? };
+        while let Some(c) = source.peek() {
+            match c {
+                c @ ('0'..='9' | 'a'..='z' | 'A'..='Z' | '_') => to.push(c.clone()),
+                '.' => break,
+                _ => Err(ParseError)?,
+            }
+            source.next();
+        }
+        
+        Ok(Self { from, to })
     }
 }
 
