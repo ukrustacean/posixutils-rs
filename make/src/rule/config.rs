@@ -18,8 +18,6 @@ pub struct Config {
     pub phony: bool,
     /// Whether rule includes precious targets
     pub precious: bool,
-    /// Whether rule includes precious targets
-    pub inference: bool,
 }
 
 #[allow(clippy::derivable_impls)]
@@ -30,7 +28,6 @@ impl Default for Config {
             silent: false,
             phony: false,
             precious: false,
-            inference: false,
         }
     }
 }

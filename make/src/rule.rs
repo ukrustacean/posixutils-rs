@@ -91,7 +91,6 @@ impl Rule {
             silent: rule_silent,
             phony: rule_phony,
             precious: rule_precious,
-            inference: rule_inference,
         } = self.config;
 
         for recipe in self.recipes() {
@@ -114,7 +113,6 @@ impl Rule {
             let precious = global_precious || rule_precious;
             let keep_going = global_keep_going;
             let terminate = global_terminate;
-            let inference = rule_inference;
             // Note: this feature can be implemented only with parser rewrite
             // Todo: parse all suffixes and return error if rules don't include them
             // -r flag
