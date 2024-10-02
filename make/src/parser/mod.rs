@@ -58,7 +58,8 @@ pub enum SyntaxKind {
     //   ENDEF,
 
     IDENTIFIER,
-    OPERATOR,
+    // Unused as we have more granular tokens for different operators
+    // OPERATOR,
     COMMENT,
     INDENT,
     ERROR,

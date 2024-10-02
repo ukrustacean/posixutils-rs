@@ -94,7 +94,13 @@ impl Rule {
         } = self.config;
 
         let files = match target {
-            Target::Inference { from, to } => { find_files_with_extension(from)?.into_iter().map(|input| { let mut output = input.clone(); output.set_extension(to); (input, output) }).collect::<Vec<_>>() }
+            Target::Inference { from, to } => {
+                find_files_with_extension(from)?.into_iter().map(|input| {
+                    let mut output = input.clone();
+                    output.set_extension(to);
+                    (input, output)
+                }).collect::<Vec<_>>()
+            }
             _ => { vec![(PathBuf::from(""), PathBuf::from(""))] }
         };
 
@@ -167,7 +173,7 @@ impl Rule {
                 );
 
                 self.init_env(env_macros, &mut command, macros);
-                self.substitute_internal_macros(target, recipe, &inout, &mut self.prerequisites());
+                self.substitute_internal_macros(target, recipe, &inout, self.prerequisites());
                 command.args(["-c", recipe.as_ref()]);
 
                 let status = match command.status() {
@@ -215,7 +221,7 @@ impl Rule {
         Ok(())
     }
 
-    fn substitute_internal_macros(&self, target: &Target, recipe: &Recipe, files: &(PathBuf, PathBuf), prereqs: &mut impl Iterator<Item=&Prerequisite>) -> Recipe {
+    fn substitute_internal_macros<'a>(&self, target: &Target, recipe: &Recipe, files: &(PathBuf, PathBuf), mut prereqs: impl Iterator<Item=&'a Prerequisite>) -> Recipe {
         let recipe = recipe.inner();
         let mut stream = recipe.chars();
         let mut result = String::new();
@@ -236,7 +242,7 @@ impl Rule {
 
                     result.push_str(body.strip_suffix(')').unwrap_or(&body))
                 }
-                Some('?') => { prereqs.map(|x| x.as_ref()).for_each(|x| result.push_str(x)); }
+                Some('?') => { (&mut prereqs).map(|x| x.as_ref()).for_each(|x| result.push_str(x)); }
                 Some('$') => { result.push('$') }
                 Some('<') => { result.push_str(files.0.to_str().unwrap()) }
                 Some('*') => { result.push_str(files.1.to_str().unwrap()) }
@@ -304,8 +310,11 @@ fn find_files_with_extension(ext: &str) -> Result<Vec<PathBuf>, ErrorCode> {
             }
 
             if metadata.is_file() {
-                let Some(e) = file.path().extension() else { continue };
-                if ext == e { result.push(file.path()); }
+                if let Some(e) = file.path().extension() {
+                    if ext == e {
+                        result.push(file.path());
+                    }
+                }
             }
         }
     }

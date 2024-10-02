@@ -154,8 +154,8 @@ pub fn parse(text: &str) -> Parse {
             self.skip_ws();
             self.expect(IDENTIFIER);
             self.skip_ws();
-            if self.tokens.pop() == Some((OPERATOR, ":".to_string())) {
-                self.builder.token(OPERATOR.into(), ":");
+            if self.tokens.pop() == Some((COLON, ":".to_string())) {
+                self.builder.token(COLON.into(), ":");
             } else {
                 self.error("expected ':'".into());
             }
@@ -179,21 +179,21 @@ pub fn parse(text: &str) -> Parse {
             self.builder.finish_node();
         }
 
-        fn parse_assignment(&mut self) {
-            self.builder.start_node(VARIABLE.into());
-            self.skip_ws();
-            if self.tokens.last() == Some(&(EXPORT, "export".to_string())) {
-                self.expect(IDENTIFIER);
-                self.skip_ws();
-            }
-            self.expect(IDENTIFIER);
-            self.skip_ws();
-            self.expect(OPERATOR);
-            self.skip_ws();
-            self.parse_expr();
-            self.expect(NEWLINE);
-            self.builder.finish_node();
-        }
+        // fn parse_assignment(&mut self) {
+        //     self.builder.start_node(VARIABLE.into());
+        //     self.skip_ws();
+        //     if self.tokens.last() == Some(&(EXPORT, "export".to_string())) {
+        //         self.expect(IDENTIFIER);
+        //         self.skip_ws();
+        //     }
+        //     self.expect(IDENTIFIER);
+        //     self.skip_ws();
+        //     self.expect(OPERATOR);
+        //     self.skip_ws();
+        //     self.parse_expr();
+        //     self.expect(NEWLINE);
+        //     self.builder.finish_node();
+        // }
 
         fn parse_macro(&mut self) {
             self.builder.start_node(MACRO.into());
@@ -217,20 +217,20 @@ pub fn parse(text: &str) -> Parse {
         fn parse(mut self) -> Parse {
             self.builder.start_node(ROOT.into());
             loop {
-                match self.find(|&&(k, _)| k == OPERATOR || k == NEWLINE || k == LPAREN) {
-                    Some((OPERATOR, ":")) => {
+                match dbg!(self.find(|&&(k, _)| k == COLON || k == NEWLINE || k == INCLUDE)) {
+                    Some((COLON, ":")) => {
                         self.parse_rule();
                     }
-                    Some((OPERATOR, "?="))
-                    | Some((OPERATOR, "="))
-                    | Some((OPERATOR, ":="))
-                    | Some((OPERATOR, "::="))
-                    | Some((OPERATOR, ":::="))
-                    | Some((OPERATOR, "+="))
-                    | Some((OPERATOR, "!=")) => {
-                        self.parse_assignment();
-                    }
-                    Some((IDENTIFIER, "include")) => {
+                    // Some((OPERATOR, "?="))
+                    // | Some((OPERATOR, "="))
+                    // | Some((OPERATOR, ":="))
+                    // | Some((OPERATOR, "::="))
+                    // | Some((OPERATOR, ":::="))
+                    // | Some((OPERATOR, "+="))
+                    // | Some((OPERATOR, "!=")) => {
+                    //     self.parse_assignment();
+                    // }
+                    Some((INCLUDE, "include")) => {
                         dbg!(&self.tokens);
                         self.parse_include();
                     }
@@ -441,7 +441,7 @@ impl Makefile {
         let mut builder = GreenNodeBuilder::new();
         builder.start_node(RULE.into());
         builder.token(IDENTIFIER.into(), target);
-        builder.token(OPERATOR.into(), ":");
+        builder.token(COLON.into(), ":");
         builder.token(NEWLINE.into(), "\n");
         builder.finish_node();
 
@@ -457,7 +457,7 @@ impl Rule {
     pub fn targets(&self) -> impl Iterator<Item = String> {
         self.syntax()
             .children_with_tokens()
-            .take_while(|it| it.as_token().map_or(true, |t| t.kind() != OPERATOR))
+            .take_while(|it| it.as_token().map_or(true, |t| t.kind() != COLON))
             .filter_map(|it| it.as_token().map(|t| t.text().to_string()))
     }
 
