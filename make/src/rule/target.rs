@@ -81,6 +81,7 @@ impl Target {
 
 impl AsRef<str> for Target {
     fn as_ref(&self) -> &'static str {
+        // TODO: leaking is very bad. Rewrite this
         self.name().leak()
     }
 }
