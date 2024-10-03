@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
+use std::fs;
 use std::iter::Peekable;
+use std::path::Path;
 
 #[derive(Debug)]
 pub struct PreprocError(pub Vec<String>);
@@ -28,7 +30,7 @@ macro_rules! error {
 
 type Result<T> = std::result::Result<T, PreprocError>;
 
-fn skip_blank(letters: &mut Peekable<impl Iterator<Item = char>>) {
+fn skip_blank(letters: &mut Peekable<impl Iterator<Item=char>>) {
     while let Some(letter) = letters.peek() {
         if !letter.is_whitespace() {
             break;
@@ -41,7 +43,7 @@ fn suitable_ident(c: &char) -> bool {
     c.is_alphanumeric() || matches!(c, '_' | '.')
 }
 
-fn get_ident(letters: &mut Peekable<impl Iterator<Item = char>>) -> Result<String> {
+fn get_ident(letters: &mut Peekable<impl Iterator<Item=char>>) -> Result<String> {
     let mut ident = String::new();
 
     while let Some(letter) = letters.peek() {
@@ -55,7 +57,21 @@ fn get_ident(letters: &mut Peekable<impl Iterator<Item = char>>) -> Result<Strin
     if ident.is_empty() { error!("Empty ident") } else { Ok(ident) }
 }
 
-fn take_till_eol(letters: &mut Peekable<impl Iterator<Item = char>>) -> String {
+fn get_file_path(letters: &mut Peekable<impl Iterator<Item=char>>) -> Result<String> {
+    let mut ident = String::new();
+
+    while let Some(letter) = letters.peek() {
+        if !(letter.is_alphanumeric() || matches!(letter, '_' | '.' | '/')) {
+            break;
+        };
+        ident.push(letter.clone());
+        letters.next();
+    }
+
+    if ident.is_empty() { error!("Empty ident") } else { Ok(ident) }
+}
+
+fn take_till_eol(letters: &mut Peekable<impl Iterator<Item=char>>) -> String {
     let mut content = String::new();
 
     while let Some(letter) = letters.peek() {
@@ -81,7 +97,7 @@ fn generate_macro_table(source: &str) -> std::result::Result<HashMap<String, Str
             Colon3,
             Bang,
             QuestionMark,
-            Plus
+            Plus,
         }
 
         let mut immediate = false;
@@ -96,7 +112,10 @@ fn generate_macro_table(source: &str) -> std::result::Result<HashMap<String, Str
             '=' => { Operator::Equals }
             ':' => {
                 let mut count = 1;
-                while let Some(':') = text.peek() { count += 1; text.next(); }
+                while let Some(':') = text.peek() {
+                    count += 1;
+                    text.next();
+                }
                 let Some('=') = text.next() else {
                     error!("Expected `=` after `:` in macro definition")?
                 };
@@ -137,7 +156,7 @@ fn generate_macro_table(source: &str) -> std::result::Result<HashMap<String, Str
             Operator::Colon | Operator::Colon2 => {
                 loop {
                     let (result, substitutions) = substitute(&macro_body, &macro_table)?;
-                    if substitutions == 0 { break } else { macro_body = result }
+                    if substitutions == 0 { break; } else { macro_body = result }
                 };
             }
             Operator::Colon3 => {
@@ -145,9 +164,7 @@ fn generate_macro_table(source: &str) -> std::result::Result<HashMap<String, Str
             }
             Operator::Bang => {
                 macro_body = substitute(&macro_body, &macro_table)?.0;
-                let mut command = macro_body.split_whitespace();
-                let Some(executable) = command.next() else { error!("No command found for calling after macro expansion")? };
-                let Ok(result) = std::process::Command::new(executable).args(command).output() else { error!("Command execution failed")? };
+                let Ok(result) = std::process::Command::new("sh").args(["-c", &macro_body]).output() else { error!("Command execution failed")? };
                 macro_body = String::from_utf8_lossy(&result.stdout).to_string();
             }
             Operator::QuestionMark => {
@@ -163,10 +180,9 @@ fn generate_macro_table(source: &str) -> std::result::Result<HashMap<String, Str
         }
 
         macro_table.insert(macro_name, macro_body);
-        
+
         Ok(())
-    }).filter_map(|x| if let Err(error) = x { Some(error.0) } else { None })
-      .flatten().collect::<Vec<_>>();
+    }).filter_map(|x| if let Err(error) = x { Some(error.0) } else { None }).flatten().collect::<Vec<_>>();
 
     if errors.is_empty() { Ok(macro_table) } else { Err(PreprocError(errors)) }
 }
@@ -186,7 +202,7 @@ fn substitute(source: &str, table: &HashMap<String, String>) -> Result<(String, 
         // TODO: Make proper error handling
         let Some(letter) = letters.next() else {
             errors.0.push("Unexpected EOF after `$` symbol".to_string());
-            continue
+            continue;
         };
         match letter {
             // Internal macros - we leave them "as is"
@@ -241,9 +257,29 @@ fn substitute(source: &str, table: &HashMap<String, String>) -> Result<(String, 
     if errors.0.is_empty() { Ok((result, substitutions)) } else { Err(errors) }
 }
 
+fn process_include_lines(source: &str, table: &HashMap<String, String>) -> (String, usize) {
+    let mut counter = 0;
+    (source.lines().map(|x|
+        if let Some(s) = x.strip_prefix("include") {
+            counter += 1;
+            let (source, _) = substitute(s, table).unwrap_or_default();
+            let mut source = source.chars().peekable();
+            skip_blank(&mut source);
+            let path = get_file_path(&mut source).unwrap();
+            let path = Path::new(&path);
+            fs::read_to_string(path).unwrap()
+        } else { x.to_string() }).collect::<String>(), counter)
+}
+
 pub fn preprocess(source: &str) -> Result<String> {
     let mut source = source.to_string();
-    let table = generate_macro_table(&source)?;
+    let mut includes = 1;
+    let mut table = generate_macro_table(&source)?;
+
+    while includes > 0 {
+        (source, includes) = process_include_lines(&source, &HashMap::new());
+        table = generate_macro_table(&source)?;
+    }
 
     loop {
         let (result, substitutions) = substitute(&source, &table)?;
