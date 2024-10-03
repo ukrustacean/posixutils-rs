@@ -173,7 +173,7 @@ impl Rule {
                 );
 
                 self.init_env(env_macros, &mut command, macros);
-                self.substitute_internal_macros(target, recipe, &inout, self.prerequisites());
+                let recipe = self.substitute_internal_macros(target, recipe, &inout, self.prerequisites());
                 command.args(["-c", recipe.as_ref()]);
 
                 let status = match command.status() {

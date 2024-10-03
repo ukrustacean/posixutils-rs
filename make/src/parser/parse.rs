@@ -217,7 +217,7 @@ pub fn parse(text: &str) -> Parse {
         fn parse(mut self) -> Parse {
             self.builder.start_node(ROOT.into());
             loop {
-                match dbg!(self.find(|&&(k, _)| k == COLON || k == NEWLINE || k == INCLUDE)) {
+                match self.find(|&&(k, _)| k == COLON || k == NEWLINE || k == INCLUDE) {
                     Some((COLON, ":")) => {
                         self.parse_rule();
                     }
