@@ -28,13 +28,13 @@ rule: prerequisite
             vec![
                 (IDENTIFIER, "VARIABLE"),
                 (WHITESPACE, " "),
-                (OPERATOR, "="),
+                (EQUALS, "="),
                 (WHITESPACE, " "),
                 (IDENTIFIER, "value"),
                 (NEWLINE, "\n"),
                 (NEWLINE, "\n"),
                 (IDENTIFIER, "rule"),
-                (OPERATOR, ":"),
+                (COLON, ":"),
                 (WHITESPACE, " "),
                 (IDENTIFIER, "prerequisite"),
                 (NEWLINE, "\n"),
@@ -53,7 +53,7 @@ rule: prerequisite
             .iter()
             .map(|(kind, text)| (*kind, text.as_str()))
             .collect::<Vec<_>>(),
-            vec![(IDENTIFIER, "export"), (NEWLINE, "\n"),]
+            vec![(EXPORT, "export"), (NEWLINE, "\n"),]
         );
     }
 
@@ -66,7 +66,7 @@ rule: prerequisite
             .map(|(kind, text)| (*kind, text.as_str()))
             .collect::<Vec<_>>(),
             vec![
-                (IDENTIFIER, "export"),
+                (EXPORT, "export"),
                 (WHITESPACE, " "),
                 (IDENTIFIER, "VARIABLE"),
                 (NEWLINE, "\n"),
@@ -83,11 +83,12 @@ rule: prerequisite
             .map(|(kind, text)| (*kind, text.as_str()))
             .collect::<Vec<_>>(),
             vec![
-                (IDENTIFIER, "export"),
+                (EXPORT, "export"),
                 (WHITESPACE, " "),
                 (IDENTIFIER, "VARIABLE"),
                 (WHITESPACE, " "),
-                (OPERATOR, ":="),
+                (COLON, ":"),
+                (EQUALS, "="),
                 (WHITESPACE, " "),
                 (IDENTIFIER, "value"),
                 (NEWLINE, "\n"),
@@ -104,7 +105,7 @@ rule: prerequisite
             .map(|(kind, text)| (*kind, text.as_str()))
             .collect::<Vec<_>>(),
             [
-                (IDENTIFIER, "include"),
+                (INCLUDE, "include"),
                 (WHITESPACE, " "),
                 (IDENTIFIER, "FILENAME"),
                 (NEWLINE, "\n")
@@ -124,7 +125,7 @@ rule: prerequisite
             .collect::<Vec<_>>(),
             vec![
                 (IDENTIFIER, "rule"),
-                (OPERATOR, ":"),
+                (COLON, ":"),
                 (WHITESPACE, " "),
                 (IDENTIFIER, "prerequisite1"),
                 (WHITESPACE, " "),
@@ -148,7 +149,8 @@ rule: prerequisite
             vec![
                 (IDENTIFIER, "VARIABLE"),
                 (WHITESPACE, " "),
-                (OPERATOR, "?="),
+                (QUESTION, "?"),
+                (EQUALS, "="),
                 (WHITESPACE, " "),
                 (IDENTIFIER, "value"),
                 (NEWLINE, "\n"),
@@ -191,7 +193,7 @@ endif
             vec![
                 (IDENTIFIER, "VARIABLE"),
                 (WHITESPACE, " "),
-                (OPERATOR, "="),
+                (EQUALS, "="),
                 (WHITESPACE, " "),
                 (DOLLAR, "$"),
                 (LPAREN, "("),
@@ -212,7 +214,7 @@ endif
             vec![
                 (IDENTIFIER, "VARIABLE"),
                 (WHITESPACE, " "),
-                (OPERATOR, "="),
+                (EQUALS, "="),
                 (WHITESPACE, " "),
                 (DOLLAR, "$"),
                 (LPAREN, "("),
