@@ -259,16 +259,16 @@ fn substitute(source: &str, table: &HashMap<String, String>) -> Result<(String, 
 
 fn process_include_lines(source: &str, table: &HashMap<String, String>) -> (String, usize) {
     let mut counter = 0;
-    (source.lines().map(|x|
+    let mut result = source.lines().map(|x|
         if let Some(s) = x.strip_prefix("include") {
             counter += 1;
+            let s = s.trim();
             let (source, _) = substitute(s, table).unwrap_or_default();
-            let mut source = source.chars().peekable();
-            skip_blank(&mut source);
-            let path = get_file_path(&mut source).unwrap();
-            let path = Path::new(&path);
-            fs::read_to_string(path).unwrap()
-        } else { x.to_string() }).collect::<String>(), counter)
+            let path = Path::new(&source);
+            let mut s = fs::read_to_string(path).unwrap();
+            s
+        } else { x.to_string() }).map(|mut x| { x.push_str("\n"); x}).collect::<String>();
+    (result, counter)
 }
 
 pub fn preprocess(source: &str) -> Result<String> {
