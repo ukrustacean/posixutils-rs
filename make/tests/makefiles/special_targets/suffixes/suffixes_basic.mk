@@ -1,6 +1,6 @@
 .SUFFIXES: .txt .out  
 
-.txt.ot:  
+.txt.out:
 	@echo "Converting copied.txt to copied.out" 
 	@cp copied.txt copied.out
 

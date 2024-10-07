@@ -233,6 +233,7 @@ endif
 mod parse {
     use posixutils_make::parser::{parse::parse, Makefile};
     use rowan::ast::AstNode;
+    use posixutils_make::parser::preprocessor::preprocess;
 
     #[test]
     fn test_parse_simple() {
@@ -250,7 +251,7 @@ rule: dependency
   VARIABLE@0..17
     IDENTIFIER@0..8 "VARIABLE"
     WHITESPACE@8..9 " "
-    OPERATOR@9..10 "="
+    EQUALS@9..10 "="
     WHITESPACE@10..11 " "
     EXPR@11..16
       IDENTIFIER@11..16 "value"
@@ -258,7 +259,7 @@ rule: dependency
   NEWLINE@17..18 "\n"
   RULE@18..44
     IDENTIFIER@18..22 "rule"
-    OPERATOR@22..23 ":"
+    COLON@22..23 ":"
     WHITESPACE@23..24 " "
     EXPR@24..34
       IDENTIFIER@24..34 "dependency"
@@ -296,14 +297,15 @@ rule: dependency
         assert_eq!(
             format!("{:#?}", node),
             r#"ROOT@0..25
-  VARIABLE@0..25
-    IDENTIFIER@0..6 "export"
+  RULE@0..25
+    EXPORT@0..6 "export"
     WHITESPACE@6..7 " "
     IDENTIFIER@7..15 "VARIABLE"
     WHITESPACE@15..16 " "
-    OPERATOR@16..18 ":="
-    WHITESPACE@18..19 " "
-    EXPR@19..24
+    COLON@16..17 ":"
+    EXPR@17..24
+      EQUALS@17..18 "="
+      WHITESPACE@18..19 " "
       IDENTIFIER@19..24 "value"
     NEWLINE@24..25 "\n"
 "#
@@ -322,7 +324,8 @@ rule: dependency
     fn test_parse_include() {
         const INCLUDE: &str = r#"include FILENAME
 "#;
-        let parsed = parse(INCLUDE);
+        let Ok(processed) = preprocess(INCLUDE) else { panic!("Could not preprocess") };
+        let parsed = parse(&processed);
         assert_eq!(parsed.errors, Vec::<String>::new());
         let node = parsed.syntax();
 
@@ -360,7 +363,7 @@ rule: dependency
             r#"ROOT@0..40
   RULE@0..40
     IDENTIFIER@0..4 "rule"
-    OPERATOR@4..5 ":"
+    COLON@4..5 ":"
     WHITESPACE@5..6 " "
     EXPR@6..29
       IDENTIFIER@6..17 "dependency1"

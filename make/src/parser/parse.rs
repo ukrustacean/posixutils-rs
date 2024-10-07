@@ -152,6 +152,8 @@ pub fn parse(text: &str) -> Parse {
         fn parse_rule(&mut self) {
             self.builder.start_node(RULE.into());
             self.skip_ws();
+            self.try_expect(EXPORT);
+            self.skip_ws();
             self.expect(IDENTIFIER);
             self.skip_ws();
             if self.tokens.pop() == Some((COLON, ":".to_string())) {
