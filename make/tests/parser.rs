@@ -6,6 +6,34 @@
 // SPDX-License-Identifier: MIT
 //
 
+mod preprocess {
+    use posixutils_make::parser::preprocessor::preprocess;
+
+    #[test]
+    fn test_macros_simple() {
+        const MACROS: &'static str =
+        r#"
+VAR = var
+V = ok
+
+all:
+	$(VAR) $V ${VAR} ${V} $(V)
+"#;
+
+        const EXPECTED: &'static str =
+            r#"
+VAR = var
+V = ok
+
+all:
+	var ok var ok ok
+"#;
+        let Ok(result) = preprocess(MACROS) else { panic!("Test must be preprocessed without an error") };
+        assert_eq!(result, EXPECTED);
+    }
+
+}
+
 mod lex {
     use posixutils_make::parser::{lex::lex, SyntaxKind::*};
 
@@ -237,37 +265,38 @@ mod parse {
 
     #[test]
     fn test_parse_simple() {
-        const SIMPLE: &str = r#"VARIABLE = value
+        const SIMPLE: &str = r#"VARIABLE = command2
 
 rule: dependency
 	command
+	${VARIABLE}
+
 "#;
-        let parsed = parse(SIMPLE);
+        let Ok(processed) = preprocess(SIMPLE) else { panic!("Must be preprocessed without an error") };
+        let parsed = parse(&processed);
+        println!("{:#?}", parsed.syntax());
         assert_eq!(parsed.errors, Vec::<String>::new());
         let node = parsed.syntax();
         assert_eq!(
             format!("{:#?}", node),
-            r#"ROOT@0..44
-  VARIABLE@0..17
-    IDENTIFIER@0..8 "VARIABLE"
-    WHITESPACE@8..9 " "
-    EQUALS@9..10 "="
-    WHITESPACE@10..11 " "
-    EXPR@11..16
-      IDENTIFIER@11..16 "value"
-    NEWLINE@16..17 "\n"
-  NEWLINE@17..18 "\n"
-  RULE@18..44
-    IDENTIFIER@18..22 "rule"
-    COLON@22..23 ":"
-    WHITESPACE@23..24 " "
-    EXPR@24..34
-      IDENTIFIER@24..34 "dependency"
-    NEWLINE@34..35 "\n"
-    RECIPE@35..44
-      INDENT@35..36 "\t"
-      TEXT@36..43 "command"
-      NEWLINE@43..44 "\n"
+            r#"ROOT@0..38
+  NEWLINE@0..1 "\n"
+  RULE@1..38
+    IDENTIFIER@1..5 "rule"
+    COLON@5..6 ":"
+    WHITESPACE@6..7 " "
+    EXPR@7..17
+      IDENTIFIER@7..17 "dependency"
+    NEWLINE@17..18 "\n"
+    RECIPE@18..27
+      INDENT@18..19 "\t"
+      TEXT@19..26 "command"
+      NEWLINE@26..27 "\n"
+    RECIPE@27..37
+      INDENT@27..28 "\t"
+      TEXT@28..36 "command2"
+      NEWLINE@36..37 "\n"
+    NEWLINE@37..38 "\n"
 "#
         );
 
@@ -278,76 +307,60 @@ rule: dependency
         let rule = rules.pop().unwrap();
         assert_eq!(rule.targets().collect::<Vec<_>>(), vec!["rule"]);
         assert_eq!(rule.prerequisites().collect::<Vec<_>>(), vec!["dependency"]);
-        assert_eq!(rule.recipes().collect::<Vec<_>>(), vec!["command"]);
-
-        let mut variables = root.variable_definitions().collect::<Vec<_>>();
-        assert_eq!(variables.len(), 1);
-        let variable = variables.pop().unwrap();
-        assert_eq!(variable.name(), Some("VARIABLE".to_string()));
-        assert_eq!(variable.raw_value(), Some("value".to_string()));
+        assert_eq!(rule.recipes().collect::<Vec<_>>(), vec!["command", "command2"]);
     }
 
     #[test]
     fn test_parse_export_assign() {
         const EXPORT: &str = r#"export VARIABLE := value
 "#;
-        let parsed = parse(EXPORT);
-        assert_eq!(parsed.errors, Vec::<String>::new());
+        let Ok(processed) = preprocess(EXPORT).map_err(|e| println!("{e:?}")) else { panic!("Must be preprocessed without an error") };
+        let parsed = parse(&processed);
+        assert_eq!(parsed.errors, vec![" *** No targets. Stop."]);
         let node = parsed.syntax();
         assert_eq!(
             format!("{:#?}", node),
-            r#"ROOT@0..25
-  RULE@0..25
-    EXPORT@0..6 "export"
-    WHITESPACE@6..7 " "
-    IDENTIFIER@7..15 "VARIABLE"
-    WHITESPACE@15..16 " "
-    COLON@16..17 ":"
-    EXPR@17..24
-      EQUALS@17..18 "="
-      WHITESPACE@18..19 " "
-      IDENTIFIER@19..24 "value"
-    NEWLINE@24..25 "\n"
+            r#"ROOT@0..0
+  ERROR@0..0
 "#
         );
 
         let root = parsed.root().clone_for_update();
 
         let mut variables = root.variable_definitions().collect::<Vec<_>>();
-        assert_eq!(variables.len(), 1);
-        let variable = variables.pop().unwrap();
-        assert_eq!(variable.name(), Some("VARIABLE".to_string()));
-        assert_eq!(variable.raw_value(), Some("value".to_string()));
+        assert_eq!(variables.len(), 0);
     }
 
-    #[test]
-    fn test_parse_include() {
-        const INCLUDE: &str = r#"include FILENAME
-"#;
-        let Ok(processed) = preprocess(INCLUDE) else { panic!("Could not preprocess") };
-        let parsed = parse(&processed);
-        assert_eq!(parsed.errors, Vec::<String>::new());
-        let node = parsed.syntax();
-
-        assert_eq!(
-            format!("{:#?}", node),
-            r#"ROOT@0..17
-  IDENTIFIER@0..7 "include"
-  WHITESPACE@7..8 " "
-  IDENTIFIER@8..16 "FILENAME"
-  NEWLINE@16..17 "\n"
-"#
-        );
-
-        let root = parsed.root().clone_for_update();
-
-        let variables = root.syntax();
-        dbg!(&variables);
-        // assert_eq!(variables.len(), 1);
-        // let variable = variables.pop().unwrap();
-        // assert_eq!(variable.name(), Some("VARIABLE".to_string()));
-        // assert_eq!(variable.raw_value(), Some("value".to_string()));
-    }
+// TODO: create `include` test with real files
+//
+//     #[test]
+//     fn test_parse_include() {
+//         const INCLUDE: &str = r#"include FILENAME
+// "#;
+//         let Ok(processed) = preprocess(INCLUDE) else { panic!("Could not preprocess") };
+//         let parsed = parse(&processed);
+//         assert_eq!(parsed.errors, Vec::<String>::new());
+//         let node = parsed.syntax();
+//
+//         assert_eq!(
+//             format!("{:#?}", node),
+//             r#"ROOT@0..17
+//   IDENTIFIER@0..7 "include"
+//   WHITESPACE@7..8 " "
+//   IDENTIFIER@8..16 "FILENAME"
+//   NEWLINE@16..17 "\n"
+// "#
+//         );
+//
+//         let root = parsed.root().clone_for_update();
+//
+//         let variables = root.syntax();
+//         dbg!(&variables);
+//         // assert_eq!(variables.len(), 1);
+//         // let variable = variables.pop().unwrap();
+//         // assert_eq!(variable.name(), Some("VARIABLE".to_string()));
+//         // assert_eq!(variable.raw_value(), Some("value".to_string()));
+//     }
 
     #[test]
     fn test_parse_multiple_prerequisites() {

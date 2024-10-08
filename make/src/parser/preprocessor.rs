@@ -103,7 +103,11 @@ fn generate_macro_table(source: &str) -> std::result::Result<HashMap<String, Str
         let mut immediate = false;
         let mut text = def.chars().peekable();
 
-        let macro_name = get_ident(&mut text)?;
+        let mut macro_name = get_ident(&mut text)?;
+        if macro_name == "export" {
+            skip_blank(&mut text);
+            macro_name = get_ident(&mut text)?;
+        }
         skip_blank(&mut text);
         let Some(symbol) = text.next() else {
             error!("Unexpected end of line!")?
@@ -271,6 +275,13 @@ fn process_include_lines(source: &str, table: &HashMap<String, String>) -> (Stri
     (result, counter)
 }
 
+fn remove_variables(source: &str) -> String {
+    source.lines().filter(|line| !line.contains('=')).map(|mut x| {
+        let mut x = x.to_string();
+        x.push_str("\n"); x }
+    ).collect::<String>()
+}
+
 pub fn preprocess(source: &str) -> Result<String> {
     let mut source = source.to_string();
     let mut includes = 1;
@@ -280,6 +291,8 @@ pub fn preprocess(source: &str) -> Result<String> {
         (source, includes) = process_include_lines(&source, &HashMap::new());
         table = generate_macro_table(&source)?;
     }
+
+    source = remove_variables(&source);
 
     loop {
         let (result, substitutions) = substitute(&source, &table)?;
