@@ -17,7 +17,7 @@ use std::{
     path::{Path, PathBuf},
     process,
 };
-
+use std::sync::atomic::Ordering::Relaxed;
 use clap::Parser;
 use const_format::formatcp;
 use gettextrs::{bind_textdomain_codeset, textdomain};
@@ -25,7 +25,7 @@ use plib::PROJECT_NAME;
 use posixutils_make::{
     config::Config,
     error_code::ErrorCode::{self, *},
-    parser::{parse::ParseError, Makefile},
+    parser::{parse::ParseError, Makefile, preprocessor::ENV_MACROS},
     Make,
 };
 
@@ -149,6 +149,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         terminate,
         ..Default::default()
     };
+    
+    ENV_MACROS.store(env_macros, Relaxed);
 
     let parsed = match parse_makefile(makefile.as_ref()) {
         Ok(parsed) => parsed,

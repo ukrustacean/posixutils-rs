@@ -3,6 +3,8 @@ use std::fmt::{Debug, Display, Formatter};
 use std::fs;
 use std::iter::Peekable;
 use std::path::Path;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering::Acquire;
 
 #[derive(Debug)]
 pub struct PreprocError(pub Vec<String>);
@@ -191,7 +193,11 @@ fn generate_macro_table(source: &str) -> std::result::Result<HashMap<String, Str
     if errors.is_empty() { Ok(macro_table) } else { Err(PreprocError(errors)) }
 }
 
+pub static ENV_MACROS: AtomicBool = AtomicBool::new(false);
+
 fn substitute(source: &str, table: &HashMap<String, String>) -> Result<(String, u32)> {
+    let env_macros = ENV_MACROS.load(Acquire);
+    
     let mut substitutions = 0;
     let mut result = String::with_capacity(source.len());
     let mut errors = PreprocError(vec![]);
@@ -218,11 +224,13 @@ fn substitute(source: &str, table: &HashMap<String, String>) -> Result<(String, 
                 continue;
             }
             c if suitable_ident(&c) => {
-                let Some(macro_body) = table.get(&c.to_string()) else {
+                let env_macro = if env_macros { std::env::var(&c.to_string()).ok() } else { None };
+                let table_macro = table.get(&c.to_string()).cloned();
+                let Some(macro_body) = env_macro.or(table_macro) else {
                     errors.0.push(format!("Undefined macro `{}`", c));
                     continue;
                 };
-                result.push_str(macro_body);
+                result.push_str(&macro_body);
                 substitutions += 1;
                 continue;
             }
@@ -242,11 +250,13 @@ fn substitute(source: &str, table: &HashMap<String, String>) -> Result<(String, 
                     continue;
                 }
 
-                let Some(macro_body) = table.get(&macro_name) else {
+                let env_macro = if env_macros { std::env::var(&macro_name).ok() } else { None };
+                let table_macro = table.get(&macro_name).cloned();
+                let Some(macro_body) = env_macro.or(table_macro) else {
                     errors.0.push(format!("Undefined macro `{}`", macro_name));
                     continue;
                 };
-                result.push_str(macro_body);
+                result.push_str(&macro_body);
                 substitutions += 1;
 
                 continue;
