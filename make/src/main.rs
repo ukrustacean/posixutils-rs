@@ -137,7 +137,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         env::set_current_dir(dir)?;
     }
 
-    let config = Config {
+    let mut config = Config {
         ignore,
         dry_run,
         silent,
@@ -149,6 +149,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         terminate,
         ..Default::default()
     };
+    
+    if clear {
+        config.rules.clear();
+    }
     
     ENV_MACROS.store(env_macros, Relaxed);
 

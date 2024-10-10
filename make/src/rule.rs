@@ -125,14 +125,8 @@ impl Rule {
                 let precious = global_precious || rule_precious;
                 let keep_going = global_keep_going;
                 let terminate = global_terminate;
-                // Note: this feature can be implemented only with parser rewrite
-                // Todo: parse all suffixes and return error if rules don't include them
-                // -r flag
-                let rules = if clear {
-                    BTreeMap::new()
-                } else {
-                    global_rules.clone()
-                };
+                
+                let rules = global_rules.clone();
 
                 *INTERRUPT_FLAG.lock().unwrap() = Some((target.as_ref().to_string(), precious));
 
