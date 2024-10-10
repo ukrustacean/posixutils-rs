@@ -8,7 +8,7 @@
 //
 
 use core::fmt;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
     error_code::ErrorCode,
@@ -29,6 +29,8 @@ pub enum SpecialTarget {
 }
 use gettextrs::gettext;
 use SpecialTarget::*;
+use crate::config::Config;
+use crate::special_target::Error::MustNotHaveRecipes;
 
 impl SpecialTarget {
     // could be automated with `strum`
@@ -59,14 +61,15 @@ impl fmt::Display for SpecialTarget {
     }
 }
 
+#[derive(Debug)]
 pub struct InferenceTarget {
     from: String,
-    to: String,
+    to: Option<String>,
 }
 
 impl InferenceTarget {
     pub fn from(&self) -> &str { self.from.as_ref() }
-    pub fn to(&self) -> &str { self.to.as_ref() }
+    pub fn to(&self) -> Option<&str> { self.to.as_ref().map(|s| s.as_str()) }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -127,32 +130,20 @@ impl TryFrom<Target> for SpecialTarget {
     }
 }
 
-impl TryFrom<Target> for InferenceTarget {
+impl TryFrom<(Target, Config)> for InferenceTarget {
     type Error = ParseError;
 
-    fn try_from(target: Target) -> Result<Self, Self::Error> {
-        let mut from = String::new();
-        let mut to = String::new();
+    fn try_from((target, config): (Target, Config)) -> Result<Self, Self::Error> {
+        let map = &BTreeSet::new();
+        let suffixes = config.rules.get(".SUFFIXES").unwrap_or(map);
+        let source = target.to_string();
         
-        let mut source = target.as_ref().chars().peekable();
-        let Some('.') = source.next() else { Err(ParseError)? };
-        while let Some(c) = source.peek() {
-            match c {
-                c @ ('0'..='9' | 'a'..='z' | 'A'..='Z' | '_') => from.push(c.clone()),
-                '.' => break,
-                _ => Err(ParseError)?,
-            }
-            source.next();
-        }
-        let Some('.') = source.next() else { Err(ParseError)? };
-        while let Some(c) = source.peek() {
-            match c {
-                c @ ('0'..='9' | 'a'..='z' | 'A'..='Z' | '_') => to.push(c.clone()),
-                '.' => break,
-                _ => Err(ParseError)?,
-            }
-            source.next();
-        }
+        let from = suffixes.iter()
+            .filter_map(|x| source.strip_prefix(x))
+            .next().ok_or(ParseError)?.to_string();
+        let to = suffixes.iter()
+            .filter_map(|x| source.strip_prefix(x))
+            .next().map(|x| x.to_string());
         
         Ok(Self { from, to })
     }

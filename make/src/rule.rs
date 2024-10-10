@@ -18,7 +18,7 @@ use crate::{
     parser::{Rule as ParsedRule, VariableDefinition},
     signal_handler, DEFAULT_SHELL, DEFAULT_SHELL_VAR,
 };
-use std::collections::VecDeque;
+use std::collections::{BTreeSet, VecDeque};
 use std::path::PathBuf;
 use std::{
     collections::{BTreeMap, HashMap},
@@ -173,7 +173,7 @@ impl Rule {
                 );
 
                 self.init_env(env_macros, &mut command, macros);
-                let recipe = self.substitute_internal_macros(target, recipe, &inout, self.prerequisites());
+                let recipe = self.substitute_internal_macros(target, recipe, &inout, self.prerequisites(), rules.get(".SUFFIXES").unwrap());
                 command.args(["-c", recipe.as_ref()]);
 
                 let status = match command.status() {
@@ -221,10 +221,19 @@ impl Rule {
         Ok(())
     }
 
-    fn substitute_internal_macros<'a>(&self, target: &Target, recipe: &Recipe, files: &(PathBuf, PathBuf), mut prereqs: impl Iterator<Item=&'a Prerequisite>) -> Recipe {
+    fn substitute_internal_macros<'a>(
+        &self,
+        target: &Target,
+        recipe: &Recipe,
+        files: &(PathBuf, PathBuf),
+        mut prereqs: impl Iterator<Item=&'a Prerequisite>,
+        config: &BTreeSet<String>
+    ) -> Recipe {
         let recipe = recipe.inner();
         let mut stream = recipe.chars();
         let mut result = String::new();
+
+        let lib_part = target.to_string().split('(').next();
 
         while let Some(ch) = stream.next() {
             if ch != '$' {
@@ -306,7 +315,7 @@ fn find_files_with_extension(ext: &str) -> Result<Vec<PathBuf>, ErrorCode> {
             let Ok(metadata) = file.metadata() else { continue };
 
             if metadata.is_dir() {
-                dirs_to_walk.push_back(file.path());
+                // dirs_to_walk.push_back(file.path());
             }
 
             if metadata.is_file() {

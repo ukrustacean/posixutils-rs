@@ -5,5 +5,5 @@
 	@cp copied.txt copied.out
 
 
-copied.ot: copied.txt
+copied.out: copied.txt
 

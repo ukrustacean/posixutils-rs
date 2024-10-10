@@ -197,7 +197,7 @@ impl TryFrom<(Makefile, Config)> for Make {
 
             if SpecialTarget::try_from(target.clone()).is_ok() {
                 special_rules.push(rule);
-            } else if InferenceTarget::try_from(target.clone()).is_ok() {
+            } else if InferenceTarget::try_from((target.clone(), config.clone())).is_ok() {
                 inference_rules.push(rule);
             } else {
                 rules.push(rule);
