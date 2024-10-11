@@ -59,20 +59,6 @@ fn get_ident(letters: &mut Peekable<impl Iterator<Item=char>>) -> Result<String>
     if ident.is_empty() { error!("Empty ident") } else { Ok(ident) }
 }
 
-fn get_file_path(letters: &mut Peekable<impl Iterator<Item=char>>) -> Result<String> {
-    let mut ident = String::new();
-
-    while let Some(letter) = letters.peek() {
-        if !(letter.is_alphanumeric() || matches!(letter, '_' | '.' | '/')) {
-            break;
-        };
-        ident.push(letter.clone());
-        letters.next();
-    }
-
-    if ident.is_empty() { error!("Empty ident") } else { Ok(ident) }
-}
-
 fn take_till_eol(letters: &mut Peekable<impl Iterator<Item=char>>) -> String {
     let mut content = String::new();
 
@@ -102,7 +88,6 @@ fn generate_macro_table(source: &str) -> std::result::Result<HashMap<String, Str
             Plus,
         }
 
-        let mut immediate = false;
         let mut text = def.chars().peekable();
 
         let mut macro_name = get_ident(&mut text)?;
@@ -126,7 +111,6 @@ fn generate_macro_table(source: &str) -> std::result::Result<HashMap<String, Str
                     error!("Expected `=` after `:` in macro definition")?
                 };
 
-                immediate = true;
                 match count {
                     1 => Operator::Colon,
                     2 => Operator::Colon2,
@@ -273,13 +257,13 @@ fn substitute(source: &str, table: &HashMap<String, String>) -> Result<(String, 
 
 fn process_include_lines(source: &str, table: &HashMap<String, String>) -> (String, usize) {
     let mut counter = 0;
-    let mut result = source.lines().map(|x|
+    let result = source.lines().map(|x|
         if let Some(s) = x.strip_prefix("include") {
             counter += 1;
             let s = s.trim();
             let (source, _) = substitute(s, table).unwrap_or_default();
             let path = Path::new(&source);
-            let mut s = fs::read_to_string(path).unwrap();
+            let s = fs::read_to_string(path).unwrap();
             s
         } else { x.to_string() }).map(|mut x| { x.push_str("\n"); x}).collect::<String>();
     (result, counter)
