@@ -89,7 +89,7 @@ impl Default for Config {
                 ),
                 (
                     "SUFFIX RULES".to_string(),
-                    BTreeSet::from([
+                    [
                         // Single-Suffix Rules
                         ".c: $(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<",
                         ".sh: cp $< $@",
@@ -111,7 +111,6 @@ impl Default for Config {
                     .into_iter()
                     .map(String::from)
                     .collect::<BTreeSet<String>>(),
-                ),
             )
             ]),
         }

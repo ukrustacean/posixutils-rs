@@ -40,7 +40,6 @@ const DEFAULT_SHELL: &str = "/bin/sh";
 pub struct Make {
     macros: Vec<VariableDefinition>,
     rules: Vec<Rule>,
-    inference_rules: Vec<Rule>,
     default_rule: Option<Rule>, // .DEFAULT
     pub config: Config,
 }
@@ -110,7 +109,7 @@ impl Make {
         }
 
         for prerequisite in &newer_prerequisites {
-            self.build_target(&prerequisite)?;
+            self.build_target(prerequisite)?;
         }
         rule.run(&self.config, &self.macros, target, up_to_date)?;
 
@@ -206,7 +205,6 @@ impl TryFrom<(Makefile, Config)> for Make {
 
         let mut make = Self {
             rules,
-            inference_rules,
             macros: makefile.variable_definitions().collect(),
             default_rule: None,
             config,

@@ -8,7 +8,7 @@
 //
 
 use core::fmt;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use crate::{
     error_code::ErrorCode,
@@ -30,7 +30,6 @@ pub enum SpecialTarget {
 use gettextrs::gettext;
 use SpecialTarget::*;
 use crate::config::Config;
-use crate::special_target::Error::MustNotHaveRecipes;
 
 impl SpecialTarget {
     // could be automated with `strum`
@@ -69,7 +68,7 @@ pub struct InferenceTarget {
 
 impl InferenceTarget {
     pub fn from(&self) -> &str { self.from.as_ref() }
-    pub fn to(&self) -> Option<&str> { self.to.as_ref().map(|s| s.as_str()) }
+    pub fn to(&self) -> Option<&str> { self.to.as_deref() }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

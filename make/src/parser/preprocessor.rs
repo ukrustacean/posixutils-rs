@@ -9,14 +9,6 @@ use std::sync::atomic::Ordering::Acquire;
 #[derive(Debug)]
 pub struct PreprocError(pub Vec<String>);
 
-impl PreprocError {
-    fn join(self, other: Self) -> Self {
-        let mut errors = self.0;
-        errors.extend(other.0);
-        Self(errors)
-    }
-}
-
 impl Display for PreprocError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         for s in self.0.iter() { writeln!(f, "{}", s)?; }
@@ -52,7 +44,7 @@ fn get_ident(letters: &mut Peekable<impl Iterator<Item=char>>) -> Result<String>
         if !suitable_ident(letter) {
             break;
         };
-        ident.push(letter.clone());
+        ident.push(*letter);
         letters.next();
     }
 
@@ -66,7 +58,7 @@ fn take_till_eol(letters: &mut Peekable<impl Iterator<Item=char>>) -> String {
         if matches!(letter, '\n' | '#') {
             break;
         };
-        content.push(letter.clone());
+        content.push(*letter);
         letters.next();
     }
 
@@ -208,7 +200,7 @@ fn substitute(source: &str, table: &HashMap<String, String>) -> Result<(String, 
                 continue;
             }
             c if suitable_ident(&c) => {
-                let env_macro = if env_macros { std::env::var(&c.to_string()).ok() } else { None };
+                let env_macro = if env_macros { std::env::var(c.to_string()).ok() } else { None };
                 let table_macro = table.get(&c.to_string()).cloned();
                 let Some(macro_body) = env_macro.or(table_macro) else {
                     errors.0.push(format!("Undefined macro `{}`", c));
@@ -263,16 +255,16 @@ fn process_include_lines(source: &str, table: &HashMap<String, String>) -> (Stri
             let s = s.trim();
             let (source, _) = substitute(s, table).unwrap_or_default();
             let path = Path::new(&source);
-            let s = fs::read_to_string(path).unwrap();
-            s
-        } else { x.to_string() }).map(|mut x| { x.push_str("\n"); x}).collect::<String>();
+            
+            fs::read_to_string(path).unwrap()
+        } else { x.to_string() }).map(|mut x| { x.push('\n'); x}).collect::<String>();
     (result, counter)
 }
 
 fn remove_variables(source: &str) -> String {
-    source.lines().filter(|line| !line.contains('=')).map(|mut x| {
+    source.lines().filter(|line| !line.contains('=')).map(|x| {
         let mut x = x.to_string();
-        x.push_str("\n"); x }
+        x.push('\n'); x }
     ).collect::<String>()
 }
 

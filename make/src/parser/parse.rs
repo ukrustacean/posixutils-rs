@@ -196,25 +196,6 @@ pub fn parse(text: &str) -> Parse {
         //     self.expect(NEWLINE);
         //     self.builder.finish_node();
         // }
-
-        fn parse_macro(&mut self) {
-            self.builder.start_node(MACRO.into());
-            self.expect(DOLLAR);
-            
-            let signs = [DOLLAR, AT_SIGN, PERCENT, QUESTION, LESS, STAR];
-            let mut has_match = false;
-            
-            for sign in signs {
-                has_match = self.try_expect(sign);
-                if has_match { break }
-            }
-            
-            if !has_match {
-                self.error(format!("expected `$`, `@`, `%`, `?`, `<` or `*` macro, got {:?}", self.current()))
-            }
-            
-            self.builder.finish_node();
-        }
         
         fn parse(mut self) -> Parse {
             self.builder.start_node(ROOT.into());
@@ -240,7 +221,7 @@ pub fn parse(text: &str) -> Parse {
                         self.bump();
                     }
                     Some(_) | None => {
-                        self.error(format!(" *** No targets. Stop."));
+                        self.error(" *** No targets. Stop.".to_string());
                         if self.current().is_some() {
                             self.bump();
                         }

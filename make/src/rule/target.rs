@@ -31,7 +31,7 @@ impl Target {
             return t;
         }
 
-        Target::Simple { name: name.into() }
+        Target::Simple { name }
     }
 
     pub fn name(&self) -> String {
@@ -44,7 +44,7 @@ impl Target {
 
     fn try_parse_special(name: &str) -> Option<Self> {
         for variant in SpecialTarget::VARIANTS {
-            if variant.as_ref() == name { return Some(Target::Special(variant.clone())); }
+            if variant.as_ref() == name { return Some(Target::Special(variant)); }
         }
         None
     }
@@ -58,7 +58,7 @@ impl Target {
 
         while let Some(c) = source.peek() {
             match c {
-                c @ ('0'..='9' | 'a'..='z' | 'A'..='Z' | '_') => from.push(c.clone()),
+                c @ ('0'..='9' | 'a'..='z' | 'A'..='Z' | '_') => from.push(*c),
                 '.' => break,
                 _ => None?,
             }
@@ -68,7 +68,7 @@ impl Target {
         let Some('.') = source.next() else { None? };
         while let Some(c) = source.peek() {
             match c {
-                c @ ('0'..='9' | 'a'..='z' | 'A'..='Z' | '_') => to.push(c.clone()),
+                c @ ('0'..='9' | 'a'..='z' | 'A'..='Z' | '_') => to.push(*c),
                 '.' | ' ' | '\t' | ':' => break,
                 _ => None?,
             }

@@ -18,10 +18,10 @@ use crate::{
     parser::{Rule as ParsedRule, VariableDefinition},
     signal_handler, DEFAULT_SHELL, DEFAULT_SHELL_VAR,
 };
-use std::collections::{BTreeSet, VecDeque};
+use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::HashMap,
     env,
     fs::{File, FileTimes},
     process::{self, Command},
@@ -35,7 +35,9 @@ use recipe::config::Config as RecipeConfig;
 use recipe::Recipe;
 use target::Target;
 
-pub static INTERRUPT_FLAG: LazyLock<Arc<Mutex<Option<(String, bool)>>>> = LazyLock::new(|| Arc::new(Mutex::new(None)));
+type LazyArcMutex<T> = LazyLock<Arc<Mutex<T>>>;
+
+pub static INTERRUPT_FLAG: LazyArcMutex<Option<(String, bool)>> = LazyLock::new(|| Arc::new(Mutex::new(None)));
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Rule {
@@ -79,18 +81,17 @@ impl Rule {
             touch: global_touch,
             env_macros: global_env_macros,
             quit: global_quit,
-            rules: ref global_rules,
-            clear: global_clear,
             print: global_print,
             keep_going: global_keep_going,
             terminate: global_terminate,
             precious: global_precious,
+            ..
         } = *global_config;
         let Config {
             ignore: rule_ignore,
             silent: rule_silent,
-            phony: rule_phony,
             precious: rule_precious,
+            ..
         } = self.config;
 
         let files = match target {
@@ -119,14 +120,10 @@ impl Rule {
                 let touch = global_touch;
                 let env_macros = global_env_macros;
                 let quit = global_quit;
-                let clear = global_clear;
                 let print = global_print;
-                let phony = rule_phony;
                 let precious = global_precious || rule_precious;
                 let keep_going = global_keep_going;
                 let terminate = global_terminate;
-                
-                let rules = global_rules.clone();
 
                 *INTERRUPT_FLAG.lock().unwrap() = Some((target.as_ref().to_string(), precious));
 
@@ -167,7 +164,7 @@ impl Rule {
                 );
 
                 self.init_env(env_macros, &mut command, macros);
-                let recipe = self.substitute_internal_macros(target, recipe, &inout, self.prerequisites(), rules.get(".SUFFIXES").unwrap());
+                let recipe = self.substitute_internal_macros(target, recipe, &inout, self.prerequisites());
                 command.args(["-c", recipe.as_ref()]);
 
                 let status = match command.status() {
@@ -221,13 +218,10 @@ impl Rule {
         recipe: &Recipe,
         files: &(PathBuf, PathBuf),
         mut prereqs: impl Iterator<Item=&'a Prerequisite>,
-        config: &BTreeSet<String>
     ) -> Recipe {
         let recipe = recipe.inner();
         let mut stream = recipe.chars();
         let mut result = String::new();
-
-        let lib_part = target.to_string().split('(').next();
 
         while let Some(ch) = stream.next() {
             if ch != '$' {
@@ -238,10 +232,10 @@ impl Rule {
             // TODO: Remove panics
             match stream.next() {
                 Some('@') => {
-                    result.push_str(&target.to_string().split('(').next().expect("Target must have lib part").to_string())
+                    result.push_str(target.as_ref().split('(').next().expect("Target must have lib part"))
                 }
                 Some('%') => {
-                    let body = target.to_string().split('(').skip(1).next().expect("Target must have lib part").to_string();
+                    let body = target.as_ref().split('(').nth(1).expect("Target must have lib part").to_string();
 
                     result.push_str(body.strip_suffix(')').unwrap_or(&body))
                 }

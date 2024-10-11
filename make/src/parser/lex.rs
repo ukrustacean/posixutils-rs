@@ -2,19 +2,15 @@ use super::SyntaxKind;
 use std::collections::HashMap;
 use std::iter::Peekable;
 use std::str::Chars;
+use std::sync::LazyLock;
 
-fn keywords() -> &'static HashMap<String, SyntaxKind> {
-    use std::sync::OnceLock;
-    use SyntaxKind::*;
-
-    static KEYWORDS: OnceLock<HashMap<String, SyntaxKind>> = OnceLock::new();
-    KEYWORDS.get_or_init(|| {
-        HashMap::from_iter([
-            ("include".to_string(), INCLUDE),
-            ("export".to_string(), EXPORT),
-        ])
-    })
-}
+use crate::parser::SyntaxKind::{EXPORT, INCLUDE};
+static KEYWORDS: LazyLock<HashMap<&'static str, SyntaxKind>> = LazyLock::new(|| {
+    HashMap::from_iter([
+        ("include", INCLUDE),
+        ("export", EXPORT),
+    ])
+});
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum LineType {
@@ -109,7 +105,7 @@ impl<'a> Lexer<'a> {
                     c if Self::is_valid_identifier_char(c) => {
                         let ident = self.read_while(Self::is_valid_identifier_char);
 
-                        if let Some(token) = keywords().get(&ident) {
+                        if let Some(token) = KEYWORDS.get(AsRef::<str>::as_ref(&ident)) {
                             Some((*token, ident))
                         } else {
                             Some((SyntaxKind::IDENTIFIER, ident))

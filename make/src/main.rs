@@ -25,7 +25,7 @@ use plib::PROJECT_NAME;
 use posixutils_make::{
     config::Config,
     error_code::ErrorCode::{self, *},
-    parser::{parse::ParseError, Makefile, preprocessor::ENV_MACROS},
+    parser::{Makefile, preprocessor::ENV_MACROS},
     Make,
 };
 
@@ -267,7 +267,7 @@ fn parse_makefile(path: Option<impl AsRef<Path>>) -> Result<Makefile, ErrorCode>
     match Makefile::from_str(&contents) {
         Ok(makefile) => Ok(makefile),
         Err(err) => Err(ErrorCode::ParserError {
-            constraint: ParseError::from(err),
+            constraint: err,
         }),
     }
 }
