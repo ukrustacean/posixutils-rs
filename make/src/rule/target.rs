@@ -38,7 +38,7 @@ impl Target {
         Target::Simple { name: name.leak() }
     }
 
-    pub fn name(self) -> &'static str {
+    pub fn name(&self) -> &'static str {
         match self {
             Target::Simple { name } => name,
             Target::Inference { name, from, to } => name,
@@ -94,8 +94,7 @@ impl Target {
 
 impl AsRef<str> for Target {
     fn as_ref(&self) -> &'static str {
-        // TODO: leaking is very bad. Rewrite this
-        self.clone().name()
+        self.name()
     }
 }
 
