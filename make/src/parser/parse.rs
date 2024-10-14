@@ -90,7 +90,7 @@ pub struct Parse {
     pub errors: Vec<String>,
 }
 
-pub fn parse(text: &str) -> Parse {
+pub fn parse(text: &str) -> Result<GreenNode, ParseError> {
     struct Parser {
         /// input tokens, including whitespace,
         /// in *reverse* order.
@@ -180,22 +180,6 @@ pub fn parse(text: &str) -> Parse {
             }
             self.builder.finish_node();
         }
-
-        // fn parse_assignment(&mut self) {
-        //     self.builder.start_node(VARIABLE.into());
-        //     self.skip_ws();
-        //     if self.tokens.last() == Some(&(EXPORT, "export".to_string())) {
-        //         self.expect(IDENTIFIER);
-        //         self.skip_ws();
-        //     }
-        //     self.expect(IDENTIFIER);
-        //     self.skip_ws();
-        //     self.expect(OPERATOR);
-        //     self.skip_ws();
-        //     self.parse_expr();
-        //     self.expect(NEWLINE);
-        //     self.builder.finish_node();
-        // }
         
         fn parse(mut self) -> Parse {
             self.builder.start_node(ROOT.into());
@@ -204,15 +188,6 @@ pub fn parse(text: &str) -> Parse {
                     Some((COLON, ":")) => {
                         self.parse_rule();
                     }
-                    // Some((OPERATOR, "?="))
-                    // | Some((OPERATOR, "="))
-                    // | Some((OPERATOR, ":="))
-                    // | Some((OPERATOR, "::="))
-                    // | Some((OPERATOR, ":::="))
-                    // | Some((OPERATOR, "+="))
-                    // | Some((OPERATOR, "!=")) => {
-                    //     self.parse_assignment();
-                    // }
                     Some((INCLUDE, "include")) => {
                         dbg!(&self.tokens);
                         self.parse_include();
@@ -289,12 +264,14 @@ pub fn parse(text: &str) -> Parse {
     let mut tokens = lex(text);
 
     tokens.reverse();
-    Parser {
+    let result = Parser {
         tokens,
         builder: GreenNodeBuilder::new(),
         errors: Vec::new(),
     }
-    .parse()
+    .parse();
+
+    if !result.errors.is_empty() { Err(ParseError(result.errors)) } else { Ok(result.green_node) }
 }
 
 /// To work with the parse results we need a view into the
@@ -401,8 +378,8 @@ impl Makefile {
         let mut buf = String::new();
         r.read_to_string(&mut buf)?;
 
-        let parsed = parse(&buf);
-        Ok(parsed.root().clone_for_update())
+        let parsed = parse(&buf)?;
+        Ok(Makefile::cast(SyntaxNode::new_root(parsed)).unwrap())
     }
 
     pub fn rules(&self) -> impl Iterator<Item = Rule> {
@@ -536,13 +513,7 @@ impl FromStr for Makefile {
     type Err = ParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let processed = preprocess(s).map_err(|e| ParseError(e.0))?;
-        let parsed = parse(&processed);
-
-        if parsed.errors.is_empty() {
-            Ok(parsed.root().clone_for_update())
-        } else {
-            Err(ParseError(parsed.errors))
-        }
+        let processed = preprocess(s).map_err(|e| ParseError(vec![e.to_string()]))?;
+        parse(&processed).map(|node| Makefile::cast(SyntaxNode::new_root(node)).unwrap())
     }
 }

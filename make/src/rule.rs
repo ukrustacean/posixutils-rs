@@ -95,7 +95,7 @@ impl Rule {
         } = self.config;
 
         let files = match target {
-            Target::Inference { from, to } => {
+            Target::Inference { name, from, to } => {
                 find_files_with_extension(from)?.into_iter().map(|input| {
                     let mut output = input.clone();
                     output.set_extension(to);

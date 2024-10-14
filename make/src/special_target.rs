@@ -40,7 +40,7 @@ impl SpecialTarget {
 }
 
 impl AsRef<str> for SpecialTarget {
-    fn as_ref(&self) -> &str {
+    fn as_ref(&self) -> &'static str {
         match self {
             Default => ".DEFAULT",
             Ignore => ".IGNORE",

@@ -7,20 +7,25 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::Acquire;
 
 #[derive(Debug)]
-pub struct PreprocError(pub Vec<String>);
+pub enum PreprocError {
+    EmptyIdent,
+    UnexpectedEOF,
+    UnexpectedSymbol(char),
+    TooManyColons,
+    BadAssignmentOperator(char),
+    CommandFailed,
+    UndefinedMacro(String),
+    BadMacroName,
+}
 
 impl Display for PreprocError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        for s in self.0.iter() { writeln!(f, "{}", s)?; }
+        writeln!(f, "{:?}", self)?;
         Ok(())
     }
 }
 
 impl std::error::Error for PreprocError {}
-
-macro_rules! error {
-    ($($e:expr),+) => { Err(PreprocError(vec![format!($($e),+)])) };
-}
 
 type Result<T> = std::result::Result<T, PreprocError>;
 
@@ -48,7 +53,7 @@ fn get_ident(letters: &mut Peekable<impl Iterator<Item=char>>) -> Result<String>
         letters.next();
     }
 
-    if ident.is_empty() { error!("Empty ident") } else { Ok(ident) }
+    if ident.is_empty() { Err(PreprocError::EmptyIdent) } else { Ok(ident) }
 }
 
 fn take_till_eol(letters: &mut Peekable<impl Iterator<Item=char>>) -> String {
@@ -65,11 +70,13 @@ fn take_till_eol(letters: &mut Peekable<impl Iterator<Item=char>>) -> String {
     content
 }
 
+/// Searches for all the lines in makefile that resemble macro definition
+/// and creates hashtable from macro names and bodies
 fn generate_macro_table(source: &str) -> std::result::Result<HashMap<String, String>, PreprocError> {
     let macro_defs = source.lines().filter(|line| line.contains('='));
     let mut macro_table = HashMap::<String, String>::new();
 
-    let errors = macro_defs.map(|def| -> Result<()> {
+    for def in macro_defs {
         enum Operator {
             Equals,
             Colon,
@@ -89,7 +96,7 @@ fn generate_macro_table(source: &str) -> std::result::Result<HashMap<String, Str
         }
         skip_blank(&mut text);
         let Some(symbol) = text.next() else {
-            error!("Unexpected end of line!")?
+            Err(PreprocError::UnexpectedEOF)?
         };
         let operator = match symbol {
             '=' => { Operator::Equals }
@@ -100,35 +107,35 @@ fn generate_macro_table(source: &str) -> std::result::Result<HashMap<String, Str
                     text.next();
                 }
                 let Some('=') = text.next() else {
-                    error!("Expected `=` after `:` in macro definition")?
+                    Err(PreprocError::BadAssignmentOperator(':'))?
                 };
 
                 match count {
                     1 => Operator::Colon,
                     2 => Operator::Colon2,
                     3 => Operator::Colon3,
-                    _ => error!("Too many columns for assignment operator!")?
+                    _ => Err(PreprocError::TooManyColons)?
                 }
             }
             '!' => {
                 let Some('=') = text.next() else {
-                    error!("Expected `=` after `!` in macro definition")?
+                    Err(PreprocError::BadAssignmentOperator('!'))?
                 };
                 Operator::Bang
             }
             '?' => {
                 let Some('=') = text.next() else {
-                    error!("Expected `=` after `?` in macro definition")?
+                    Err(PreprocError::BadAssignmentOperator('?'))?
                 };
                 Operator::QuestionMark
             }
             '+' => {
                 let Some('=') = text.next() else {
-                    error!("Expected `=` after `+` in macro definition")?
+                    Err(PreprocError::BadAssignmentOperator('+'))?
                 };
                 Operator::Plus
             }
-            c => error!("Unexpected symbol `{}` in macro definition", c)?,
+            c => Err(PreprocError::UnexpectedSymbol(c))?,
         };
         skip_blank(&mut text);
         let mut macro_body = take_till_eol(&mut text);
@@ -146,7 +153,7 @@ fn generate_macro_table(source: &str) -> std::result::Result<HashMap<String, Str
             }
             Operator::Bang => {
                 macro_body = substitute(&macro_body, &macro_table)?.0;
-                let Ok(result) = std::process::Command::new("sh").args(["-c", &macro_body]).output() else { error!("Command execution failed")? };
+                let Ok(result) = std::process::Command::new("sh").args(["-c", &macro_body]).output() else { Err(PreprocError::CommandFailed)? };
                 macro_body = String::from_utf8_lossy(&result.stdout).to_string();
             }
             Operator::QuestionMark => {
@@ -162,11 +169,9 @@ fn generate_macro_table(source: &str) -> std::result::Result<HashMap<String, Str
         }
 
         macro_table.insert(macro_name, macro_body);
-
-        Ok(())
-    }).filter_map(|x| if let Err(error) = x { Some(error.0) } else { None }).flatten().collect::<Vec<_>>();
-
-    if errors.is_empty() { Ok(macro_table) } else { Err(PreprocError(errors)) }
+    }
+    
+    Ok(macro_table)
 }
 
 pub static ENV_MACROS: AtomicBool = AtomicBool::new(false);
@@ -176,7 +181,6 @@ fn substitute(source: &str, table: &HashMap<String, String>) -> Result<(String, 
     
     let mut substitutions = 0;
     let mut result = String::with_capacity(source.len());
-    let mut errors = PreprocError(vec![]);
 
     let mut letters = source.chars().peekable();
     while let Some(letter) = letters.next() {
@@ -184,12 +188,11 @@ fn substitute(source: &str, table: &HashMap<String, String>) -> Result<(String, 
             result.push(letter);
             continue;
         }
-
-        // TODO: Make proper error handling
+        
         let Some(letter) = letters.next() else {
-            errors.0.push("Unexpected EOF after `$` symbol".to_string());
-            continue;
+            Err(PreprocError::UnexpectedEOF)?
         };
+        
         match letter {
             // Internal macros - we leave them "as is"
             // yet as they will be dealt with in the
@@ -203,8 +206,7 @@ fn substitute(source: &str, table: &HashMap<String, String>) -> Result<(String, 
                 let env_macro = if env_macros { std::env::var(c.to_string()).ok() } else { None };
                 let table_macro = table.get(&c.to_string()).cloned();
                 let Some(macro_body) = env_macro.or(table_macro) else {
-                    errors.0.push(format!("Undefined macro `{}`", c));
-                    continue;
+                    Err(PreprocError::UndefinedMacro(c.to_string()))?
                 };
                 result.push_str(&macro_body);
                 substitutions += 1;
@@ -213,40 +215,37 @@ fn substitute(source: &str, table: &HashMap<String, String>) -> Result<(String, 
             '(' | '{' => {
                 skip_blank(&mut letters);
                 let Ok(macro_name) = get_ident(&mut letters) else {
-                    errors.0.push("Could not get a macro name".to_string());
-                    continue;
+                    Err(PreprocError::BadMacroName)?
                 };
                 skip_blank(&mut letters);
                 let Some(finilizer) = letters.next() else {
-                    errors.0.push("Unexpected EOF at the end of macro expansion".to_string());
-                    continue;
+                    Err(PreprocError::UnexpectedEOF)?
                 };
                 if !matches!(finilizer, ')' | '}') {
-                    errors.0.push(format!("Unexpected `{}` at the end of macro expansion", finilizer));
-                    continue;
+                    Err(PreprocError::UnexpectedSymbol(finilizer))?
                 }
 
                 let env_macro = if env_macros { std::env::var(&macro_name).ok() } else { None };
                 let table_macro = table.get(&macro_name).cloned();
                 let Some(macro_body) = env_macro.or(table_macro) else {
-                    errors.0.push(format!("Undefined macro `{}`", macro_name));
-                    continue;
+                    Err(PreprocError::UndefinedMacro(macro_name.to_string()))?
                 };
                 result.push_str(&macro_body);
                 substitutions += 1;
 
                 continue;
             }
-            // TODO: Make proper error handling
             c => {
-                panic!("Unexpected `{}` after `$` symbol", c);
+                Err(PreprocError::UnexpectedSymbol(c))?
             }
         }
     }
-
-    if errors.0.is_empty() { Ok((result, substitutions)) } else { Err(errors) }
+    
+    Ok((result, substitutions))
 }
 
+/// Copy-pastes included makefiles into single one recursively.
+/// Pretty much the same as C preprocessor and `#include` directive
 fn process_include_lines(source: &str, table: &HashMap<String, String>) -> (String, usize) {
     let mut counter = 0;
     let result = source.lines().map(|x|
@@ -268,6 +267,7 @@ fn remove_variables(source: &str) -> String {
     ).collect::<String>()
 }
 
+/// Processes `include`s and macros
 pub fn preprocess(source: &str) -> Result<String> {
     let mut source = source.to_string();
     let mut includes = 1;

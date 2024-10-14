@@ -13,8 +13,12 @@ use crate::special_target::SpecialTarget;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 /// A target for a rule.
 pub enum Target {
-    Simple { name: String },
-    Inference { from: String, to: String },
+    Simple { name: &'static str },
+    Inference {
+        name: &'static str,
+        from: &'static str,
+        to:   &'static str,
+    },
     Special(SpecialTarget),
 }
 
@@ -31,14 +35,23 @@ impl Target {
             return t;
         }
 
-        Target::Simple { name }
+        Target::Simple { name: name.leak() }
     }
 
-    pub fn name(&self) -> String {
+    pub fn name(self) -> &'static str {
         match self {
-            Target::Simple { name } => name.clone(),
-            Target::Inference { from, to } => format!(".{}.{}", from, to),
-            Target::Special(target) => target.as_ref().to_string(),
+            Target::Simple { name } => name,
+            Target::Inference { name, from, to } => name,
+            Target::Special(target) => match target {
+                SpecialTarget::Default => ".DEFAULT",
+                SpecialTarget::Ignore => ".IGNORE",
+                SpecialTarget::Posix => ".POSIX",
+                SpecialTarget::Precious => ".PRECIOUS",
+                SpecialTarget::SccsGet => ".SCCS_GET",
+                SpecialTarget::Silent => ".SILENT",
+                SpecialTarget::Suffixes => ".SUFFIXES",
+                SpecialTarget::Phony => ".PHONY",
+            },
         }
     }
 
@@ -75,19 +88,19 @@ impl Target {
             source.next();
         }
 
-        Some(Self::Inference { from, to })
+        Some(Self::Inference { name: format!(".{from}.{to}").leak(), from: from.leak(), to: to.leak() })
     }
 }
 
 impl AsRef<str> for Target {
     fn as_ref(&self) -> &'static str {
         // TODO: leaking is very bad. Rewrite this
-        self.name().leak()
+        self.clone().name()
     }
 }
 
 impl fmt::Display for Target {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.name())
+        write!(f, "{}", self.clone().name())
     }
 }

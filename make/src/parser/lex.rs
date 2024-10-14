@@ -58,6 +58,7 @@ impl<'a> Lexer<'a> {
         }
         result
     }
+    
     /// Retrieves the next token from the input stream, identifying its type and value
     ///
     /// # Returns
