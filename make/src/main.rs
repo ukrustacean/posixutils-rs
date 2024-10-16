@@ -7,8 +7,20 @@
 // SPDX-License-Identifier: MIT
 //
 
+use clap::Parser;
+use const_format::formatcp;
 use core::str::FromStr;
+use gettextrs::{bind_textdomain_codeset, gettext, textdomain};
+use plib::PROJECT_NAME;
+use posixutils_make::{
+    config::Config,
+    error_code::ErrorCode::{self, *},
+    parser::{preprocessor::ENV_MACROS, Makefile},
+    Make,
+};
+use std::sync::atomic::Ordering::Relaxed;
 use std::{
+    collections::{BTreeMap, BTreeSet},
     env,
     ffi::OsString,
     fs,
@@ -17,33 +29,37 @@ use std::{
     process,
 };
 
-use clap::Parser;
-use const_format::formatcp;
-use gettextrs::{bind_textdomain_codeset, textdomain};
-use makefile_lossless::Makefile;
-use plib::PROJECT_NAME;
-use posixutils_make::{
-    config::Config,
-    error_code::ErrorCode::{self, *},
-    Make,
-};
-
 const MAKEFILE_NAME: [&str; 2] = ["makefile", "Makefile"];
 const MAKEFILE_PATH: [&str; 2] = [
     formatcp!("./{}", MAKEFILE_NAME[0]),
     formatcp!("./{}", MAKEFILE_NAME[1]),
 ];
 
+// todo: sort arguments
 #[derive(Parser, Debug)]
 struct Args {
     #[arg(short = 'C', long, help = "Change to DIRECTORY before doing anything")]
     directory: Option<PathBuf>,
+
+    #[arg(
+        short = 'S',
+        long,
+        help = "Terminate make if error occurs. Default behavior"
+    )]
+    terminate: bool,
 
     #[arg(short = 'f', long, help = "Path to the makefile to parse")]
     makefile: Option<PathBuf>,
 
     #[arg(short = 'i', long, help = "Ignore errors in the recipe")]
     ignore: bool,
+
+    #[arg(
+        short = 'e',
+        long,
+        help = "Cause environment variables to override macro assignments within makefiles"
+    )]
+    env_macros: bool,
 
     #[arg(
         short = 'n',
@@ -54,6 +70,34 @@ struct Args {
 
     #[arg(short = 's', long, help = "Do not print recipe lines")]
     silent: bool,
+
+    #[arg(
+        short = 'q',
+        long,
+        help = "Return a zero exit value if the target file is up-to-date; otherwise, return an exit value of 1."
+    )]
+    quit: bool,
+
+    #[arg(
+        short = 'k',
+        long,
+        help = "Continue to update other targets that do not depend on the current target if a non-ignored error occur"
+    )]
+    keep_going: bool,
+
+    #[arg(
+        short = 'r',
+        long,
+        help = "Clear the suffix list and do not use the built-in rules"
+    )]
+    clear: bool,
+
+    #[arg(
+        short = 'p',
+        long,
+        help = "Write to standard output the complete set of macro definitions and target descriptions."
+    )]
+    print: bool,
 
     #[arg(
         short = 't',
@@ -73,10 +117,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let Args {
         directory,
         makefile,
+        env_macros,
         ignore,
         dry_run,
         silent,
+        quit,
+        clear,
         touch,
+        print,
+        terminate,
+        keep_going,
         mut targets,
     } = Args::parse();
 
@@ -87,21 +137,52 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         env::set_current_dir(dir)?;
     }
 
-    let parsed = parse_makefile(makefile.as_ref()).unwrap_or_else(|err| {
-        eprintln!("make: {}", err);
-        process::exit(err.into());
-    });
-    let config = Config {
+    let mut config = Config {
         ignore,
         dry_run,
         silent,
         touch,
+        env_macros,
+        quit,
+        keep_going,
+        clear,
+        print,
+        precious: false,
+        terminate,
+        rules: Default::default(),
+    };
+
+    if clear {
+        config.rules.clear();
+    }
+
+    ENV_MACROS.store(env_macros, Relaxed);
+
+    let parsed = match parse_makefile(makefile.as_ref()) {
+        Ok(parsed) => parsed,
+        Err(err) => {
+            // -p flag
+            if print {
+                // If makefile is not provided or parsing failed, print the default rules
+                print_rules(&config.rules);
+                return Ok(());
+            } else {
+                eprintln!("make: {}", err);
+                process::exit(err.into());
+            }
+        }
     };
 
     let make = Make::try_from((parsed, config)).unwrap_or_else(|err| {
         eprintln!("make: {err}");
         process::exit(err.into());
     });
+
+    // -p flag
+    if print {
+        // Call print for  global config rules
+        print_rules(&make.config.rules);
+    }
 
     if targets.is_empty() {
         let target = make
@@ -116,6 +197,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         targets.push(target);
     }
 
+    let mut had_error = false;
     for target in targets {
         let target = target.into_string().unwrap();
         match make.build_target(&target) {
@@ -130,12 +212,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
+        if keep_going {
+            eprintln!("{}: Target {} not remade because of errors", gettext("make"), target);
+            had_error = true;
+        }
+
         if status_code != 0 {
             break;
         }
     }
 
+    if had_error { status_code = 2; }
     process::exit(status_code);
+}
+
+fn print_rules(
+    rules: &BTreeMap<String, BTreeSet<String>>,
+) {
+    print!("{:?}", rules);
 }
 
 /// Parse the makefile at the given path, or the first default makefile found.
@@ -175,7 +269,7 @@ fn parse_makefile(path: Option<impl AsRef<Path>>) -> Result<Makefile, ErrorCode>
 
     match Makefile::from_str(&contents) {
         Ok(makefile) => Ok(makefile),
-        Err(err) => Err(ParseError(err.to_string())),
+        Err(err) => Err(ErrorCode::ParserError { constraint: err }),
     }
 }
 
