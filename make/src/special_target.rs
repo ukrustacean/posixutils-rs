@@ -27,9 +27,9 @@ pub enum SpecialTarget {
     Silent,
     Suffixes,
 }
+use crate::config::Config;
 use gettextrs::gettext;
 use SpecialTarget::*;
-use crate::config::Config;
 
 impl SpecialTarget {
     // could be automated with `strum`
@@ -67,8 +67,13 @@ pub struct InferenceTarget {
 }
 
 impl InferenceTarget {
-    pub fn from(&self) -> &str { self.from.as_ref() }
-    pub fn to(&self) -> Option<&str> { self.to.as_deref() }
+    pub fn from(&self) -> &str {
+        self.from.as_ref()
+    }
+
+    pub fn to(&self) -> Option<&str> {
+        self.to.as_deref()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -136,14 +141,19 @@ impl TryFrom<(Target, Config)> for InferenceTarget {
         let map = &BTreeSet::new();
         let suffixes = config.rules.get(".SUFFIXES").unwrap_or(map);
         let source = target.to_string();
-        
-        let from = suffixes.iter()
+
+        let from = suffixes
+            .iter()
             .filter_map(|x| source.strip_prefix(x))
-            .next().ok_or(ParseError)?.to_string();
-        let to = suffixes.iter()
+            .next()
+            .ok_or(ParseError)?
+            .to_string();
+        let to = suffixes
+            .iter()
             .filter_map(|x| source.strip_prefix(x))
-            .next().map(|x| x.to_string());
-        
+            .next()
+            .map(|x| x.to_string());
+
         Ok(Self { from, to })
     }
 }
@@ -252,24 +262,17 @@ impl Processor<'_> {
     }
 
     fn process_suffixes(self) -> Result<(), Error> {
-        let suffixes_key = ".SUFFIXES";
+        let suffixes_key = Suffixes.as_ref();
         let suffixes_set = self
             .rule
             .prerequisites()
             .map(|suffix| suffix.as_ref().to_string())
             .collect::<BTreeSet<String>>();
 
-        if suffixes_set.is_empty() {
-            self.make
-                .config
-                .rules
-                .insert(suffixes_key.to_string(), BTreeSet::new());
-        } else {
-            self.make
-                .config
-                .rules
-                .insert(suffixes_key.to_string(), suffixes_set);
-        }
+        self.make
+            .config
+            .rules
+            .insert(suffixes_key.to_string(), suffixes_set);
 
         Ok(())
     }
@@ -283,7 +286,7 @@ impl Processor<'_> {
         self.make
             .config
             .rules
-            .insert(".PHONY".to_string(), suffixes_set);
+            .insert(Phony.as_ref().to_string(), suffixes_set);
 
         let what_to_do = |rule: &mut Rule| rule.config.phony = true;
         self.additive(what_to_do);
@@ -307,7 +310,7 @@ impl Processor<'_> {
         self.make
             .config
             .rules
-            .insert(".PRECIOUS".to_string(), precious_set);
+            .insert(Precious.as_ref().to_string(), precious_set);
         Ok(())
     }
     fn process_sccs_get(self) -> Result<(), Error> {
@@ -322,7 +325,7 @@ impl Processor<'_> {
         self.make
             .config
             .rules
-            .insert(".SCCS_GET".to_string(), sccs_set);
+            .insert(SccsGet.as_ref().to_string(), sccs_set);
 
         Ok(())
     }

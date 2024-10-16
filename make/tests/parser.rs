@@ -11,8 +11,7 @@ mod preprocess {
 
     #[test]
     fn test_macros_simple() {
-        const MACROS: &'static str =
-        r#"
+        const MACROS: &'static str = r#"
 VAR = var
 V = ok
 
@@ -20,18 +19,18 @@ all:
 	$(VAR) $V ${VAR} ${V} $(V)
 "#;
 
-        const EXPECTED: &'static str =
-            r#"
+        const EXPECTED: &'static str = r#"
 VAR = var
 V = ok
 
 all:
 	var ok var ok ok
 "#;
-        let Ok(result) = preprocess(MACROS) else { panic!("Test must be preprocessed without an error") };
+        let Ok(result) = preprocess(MACROS) else {
+            panic!("Test must be preprocessed without an error")
+        };
         assert_eq!(result, EXPECTED);
     }
-
 }
 
 mod lex {
@@ -259,9 +258,9 @@ endif
 }
 
 mod parse {
+    use posixutils_make::parser::preprocessor::preprocess;
     use posixutils_make::parser::{parse::parse, Makefile};
     use rowan::ast::AstNode;
-    use posixutils_make::parser::preprocessor::preprocess;
 
     #[test]
     fn test_parse_simple() {
@@ -272,7 +271,9 @@ rule: dependency
 	${VARIABLE}
 
 "#;
-        let Ok(processed) = preprocess(SIMPLE) else { panic!("Must be preprocessed without an error") };
+        let Ok(processed) = preprocess(SIMPLE) else {
+            panic!("Must be preprocessed without an error")
+        };
         let parsed = parse(&processed);
         println!("{:#?}", parsed.syntax());
         assert_eq!(parsed.errors, Vec::<String>::new());
@@ -307,14 +308,19 @@ rule: dependency
         let rule = rules.pop().unwrap();
         assert_eq!(rule.targets().collect::<Vec<_>>(), vec!["rule"]);
         assert_eq!(rule.prerequisites().collect::<Vec<_>>(), vec!["dependency"]);
-        assert_eq!(rule.recipes().collect::<Vec<_>>(), vec!["command", "command2"]);
+        assert_eq!(
+            rule.recipes().collect::<Vec<_>>(),
+            vec!["command", "command2"]
+        );
     }
 
     #[test]
     fn test_parse_export_assign() {
         const EXPORT: &str = r#"export VARIABLE := value
 "#;
-        let Ok(processed) = preprocess(EXPORT).map_err(|e| println!("{e:?}")) else { panic!("Must be preprocessed without an error") };
+        let Ok(processed) = preprocess(EXPORT).map_err(|e| println!("{e:?}")) else {
+            panic!("Must be preprocessed without an error")
+        };
         let parsed = parse(&processed);
         assert_eq!(parsed.errors, vec![" *** No targets. Stop."]);
         let node = parsed.syntax();
@@ -331,36 +337,36 @@ rule: dependency
         assert_eq!(variables.len(), 0);
     }
 
-// TODO: create `include` test with real files
-//
-//     #[test]
-//     fn test_parse_include() {
-//         const INCLUDE: &str = r#"include FILENAME
-// "#;
-//         let Ok(processed) = preprocess(INCLUDE) else { panic!("Could not preprocess") };
-//         let parsed = parse(&processed);
-//         assert_eq!(parsed.errors, Vec::<String>::new());
-//         let node = parsed.syntax();
-//
-//         assert_eq!(
-//             format!("{:#?}", node),
-//             r#"ROOT@0..17
-//   IDENTIFIER@0..7 "include"
-//   WHITESPACE@7..8 " "
-//   IDENTIFIER@8..16 "FILENAME"
-//   NEWLINE@16..17 "\n"
-// "#
-//         );
-//
-//         let root = parsed.root().clone_for_update();
-//
-//         let variables = root.syntax();
-//         dbg!(&variables);
-//         // assert_eq!(variables.len(), 1);
-//         // let variable = variables.pop().unwrap();
-//         // assert_eq!(variable.name(), Some("VARIABLE".to_string()));
-//         // assert_eq!(variable.raw_value(), Some("value".to_string()));
-//     }
+    // TODO: create `include` test with real files
+    //
+    //     #[test]
+    //     fn test_parse_include() {
+    //         const INCLUDE: &str = r#"include FILENAME
+    // "#;
+    //         let Ok(processed) = preprocess(INCLUDE) else { panic!("Could not preprocess") };
+    //         let parsed = parse(&processed);
+    //         assert_eq!(parsed.errors, Vec::<String>::new());
+    //         let node = parsed.syntax();
+    //
+    //         assert_eq!(
+    //             format!("{:#?}", node),
+    //             r#"ROOT@0..17
+    //   IDENTIFIER@0..7 "include"
+    //   WHITESPACE@7..8 " "
+    //   IDENTIFIER@8..16 "FILENAME"
+    //   NEWLINE@16..17 "\n"
+    // "#
+    //         );
+    //
+    //         let root = parsed.root().clone_for_update();
+    //
+    //         let variables = root.syntax();
+    //         dbg!(&variables);
+    //         // assert_eq!(variables.len(), 1);
+    //         // let variable = variables.pop().unwrap();
+    //         // assert_eq!(variable.name(), Some("VARIABLE".to_string()));
+    //         // assert_eq!(variable.raw_value(), Some("value".to_string()));
+    //     }
 
     #[test]
     fn test_parse_multiple_prerequisites() {

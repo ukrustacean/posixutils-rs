@@ -22,11 +22,11 @@ use std::{
 
 use parser::{Makefile, VariableDefinition};
 
+use crate::special_target::InferenceTarget;
 use config::Config;
 use error_code::ErrorCode::{self, *};
 use rule::{prerequisite::Prerequisite, target::Target, Rule};
 use special_target::SpecialTarget;
-use crate::special_target::InferenceTarget;
 
 /// The default shell variable name.
 const DEFAULT_SHELL_VAR: &str = "SHELL";

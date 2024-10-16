@@ -180,7 +180,7 @@ pub fn parse(text: &str) -> Result<GreenNode, ParseError> {
             }
             self.builder.finish_node();
         }
-        
+
         fn parse(mut self) -> Parse {
             self.builder.start_node(ROOT.into());
             loop {
@@ -253,7 +253,7 @@ pub fn parse(text: &str) -> Result<GreenNode, ParseError> {
                 true
             }
         }
-        
+
         fn skip_ws(&mut self) {
             while self.current() == Some(WHITESPACE) {
                 self.bump()
@@ -271,7 +271,11 @@ pub fn parse(text: &str) -> Result<GreenNode, ParseError> {
     }
     .parse();
 
-    if !result.errors.is_empty() { Err(ParseError(result.errors)) } else { Ok(result.green_node) }
+    if !result.errors.is_empty() {
+        Err(ParseError(result.errors))
+    } else {
+        Ok(result.green_node)
+    }
 }
 
 /// To work with the parse results we need a view into the

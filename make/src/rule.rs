@@ -28,7 +28,7 @@ use std::{
     sync::{Arc, LazyLock, Mutex},
     time::SystemTime,
 };
-
+use std::io::ErrorKind;
 use config::Config;
 use prerequisite::Prerequisite;
 use recipe::config::Config as RecipeConfig;
@@ -95,14 +95,14 @@ impl Rule {
         } = self.config;
 
         let files = match target {
-            Target::Inference { name, from, to } => {
-                find_files_with_extension(from)?.into_iter().map(|input| {
-                    let mut output = input.clone();
-                    output.set_extension(to);
-                    (input, output)
-                }).collect::<Vec<_>>()
+            Target::Inference { name, from, to } => find_files_with_extension(from)?.into_iter().map(|input| {
+                let mut output = input.clone();
+                output.set_extension(to);
+                (input, output)
+            }).collect::<Vec<_>>(),
+            _ => {
+                vec![(PathBuf::from(""), PathBuf::from(""))]
             }
-            _ => { vec![(PathBuf::from(""), PathBuf::from(""))] }
         };
 
         for inout in files {
@@ -130,8 +130,6 @@ impl Rule {
                 if !ignore || print || quit || dry_run {
                     signal_handler::register_signals();
                 }
-
-                // Todo: somehow catch parse and print changed default_rules
 
                 if !force_run {
                     // -n flag
@@ -181,7 +179,7 @@ impl Rule {
                     // -S and -k flags
                     if !terminate && keep_going {
                         eprintln!(
-                            "make: {:?}",
+                            "make: {}",
                             ExecutionError {
                                 exit_code: status.code(),
                             }
@@ -229,22 +227,27 @@ impl Rule {
                 continue;
             }
 
-            // TODO: Remove panics
             match stream.next() {
-                Some('@') => {
-                    result.push_str(target.as_ref().split('(').next().expect("Target must have lib part"))
-                }
+                Some('@') => if let Some(s) = target.as_ref().split('(').next() {
+                    result.push_str(
+                        s
+                    )
+                },
                 Some('%') => {
-                    let body = target.as_ref().split('(').nth(1).expect("Target must have lib part").to_string();
-
-                    result.push_str(body.strip_suffix(')').unwrap_or(&body))
+                    if let Some(body) = target.as_ref().split('(').nth(1) {
+                        result.push_str(body.strip_suffix(')').unwrap_or(body))
+                    }
                 }
-                Some('?') => { (&mut prereqs).map(|x| x.as_ref()).for_each(|x| result.push_str(x)); }
-                Some('$') => { result.push('$') }
-                Some('<') => { result.push_str(files.0.to_str().unwrap()) }
-                Some('*') => { result.push_str(files.1.to_str().unwrap()) }
-                Some(_) => { break }
-                None => { panic!("Unexpected `$` at the end of the rule!") }
+                Some('?') => {
+                    (&mut prereqs).map(|x| x.as_ref()).for_each(|x| result.push_str(x));
+                }
+                Some('$') => result.push('$'),
+                Some('<') => result.push_str(files.0.to_str().unwrap()),
+                Some('*') => result.push_str(files.1.to_str().unwrap()),
+                Some(_) => break,
+                None => {
+                    eprintln!("Unexpected `$` at the end of the rule!")
+                }
             }
         }
 
@@ -293,18 +296,16 @@ fn find_files_with_extension(ext: &str) -> Result<Vec<PathBuf>, ErrorCode> {
     use std::{env, fs};
 
     let mut result = vec![];
-    let current = env::current_dir().unwrap();
+    let Ok(current) = env::current_dir() else { Err(IoError(ErrorKind::PermissionDenied))? };
     let mut dirs_to_walk = VecDeque::new();
     dirs_to_walk.push_back(current);
 
     while let Some(path) = dirs_to_walk.pop_front() {
         let files = fs::read_dir(path)?;
         for file in files.filter_map(Result::ok) {
-            let Ok(metadata) = file.metadata() else { continue };
-
-            if metadata.is_dir() {
-                // dirs_to_walk.push_back(file.path());
-            }
+            let Ok(metadata) = file.metadata() else {
+                continue;
+            };
 
             if metadata.is_file() {
                 if let Some(e) = file.path().extension() {

@@ -5,12 +5,8 @@ use std::str::Chars;
 use std::sync::LazyLock;
 
 use crate::parser::SyntaxKind::{EXPORT, INCLUDE};
-static KEYWORDS: LazyLock<HashMap<&'static str, SyntaxKind>> = LazyLock::new(|| {
-    HashMap::from_iter([
-        ("include", INCLUDE),
-        ("export", EXPORT),
-    ])
-});
+static KEYWORDS: LazyLock<HashMap<&'static str, SyntaxKind>> =
+    LazyLock::new(|| HashMap::from_iter([("include", INCLUDE), ("export", EXPORT)]));
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum LineType {
@@ -58,7 +54,7 @@ impl<'a> Lexer<'a> {
         }
         result
     }
-    
+
     /// Retrieves the next token from the input stream, identifying its type and value
     ///
     /// # Returns

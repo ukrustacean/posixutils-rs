@@ -648,12 +648,14 @@ mod special_targets {
         fn create_txt() {
             let dir = env::current_dir().unwrap();
             for file in dir.read_dir().unwrap().map(Result::unwrap) {
-                if !file.file_type().map(|x| x.is_file()).unwrap_or(false) { continue; }
+                if !file.file_type().map(|x| x.is_file()).unwrap_or(false) {
+                    continue;
+                }
                 if file.path().extension().map(|x| x == "txt").unwrap_or(false) {
                     remove_file(file.path()).unwrap();
                 }
             }
-            
+
             File::create("copied.txt")
                 .unwrap()
                 .write_all(b"some content")

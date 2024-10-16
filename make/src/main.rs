@@ -7,7 +7,18 @@
 // SPDX-License-Identifier: MIT
 //
 
+use clap::Parser;
+use const_format::formatcp;
 use core::str::FromStr;
+use gettextrs::{bind_textdomain_codeset, textdomain};
+use plib::PROJECT_NAME;
+use posixutils_make::{
+    config::Config,
+    error_code::ErrorCode::{self, *},
+    parser::{preprocessor::ENV_MACROS, Makefile},
+    Make,
+};
+use std::sync::atomic::Ordering::Relaxed;
 use std::{
     collections::{BTreeMap, BTreeSet},
     env,
@@ -16,17 +27,6 @@ use std::{
     io::{self, Read},
     path::{Path, PathBuf},
     process,
-};
-use std::sync::atomic::Ordering::Relaxed;
-use clap::Parser;
-use const_format::formatcp;
-use gettextrs::{bind_textdomain_codeset, textdomain};
-use plib::PROJECT_NAME;
-use posixutils_make::{
-    config::Config,
-    error_code::ErrorCode::{self, *},
-    parser::{Makefile, preprocessor::ENV_MACROS},
-    Make,
 };
 
 const MAKEFILE_NAME: [&str; 2] = ["makefile", "Makefile"];
@@ -149,11 +149,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         terminate,
         ..Default::default()
     };
-    
+
     if clear {
         config.rules.clear();
     }
-    
+
     ENV_MACROS.store(env_macros, Relaxed);
 
     let parsed = match parse_makefile(makefile.as_ref()) {
@@ -266,9 +266,7 @@ fn parse_makefile(path: Option<impl AsRef<Path>>) -> Result<Makefile, ErrorCode>
 
     match Makefile::from_str(&contents) {
         Ok(makefile) => Ok(makefile),
-        Err(err) => Err(ErrorCode::ParserError {
-            constraint: err,
-        }),
+        Err(err) => Err(ErrorCode::ParserError { constraint: err }),
     }
 }
 

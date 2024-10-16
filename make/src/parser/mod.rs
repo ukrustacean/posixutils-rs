@@ -40,7 +40,7 @@ pub enum SyntaxKind {
     PLUS,
     STAR,
     TAB,
-    
+
     // Keywords
     INCLUDE,
     EXPORT,
@@ -56,7 +56,6 @@ pub enum SyntaxKind {
     //   DEFINE,
     //   UNDEFINE,
     //   ENDEF,
-
     IDENTIFIER,
     // Unused as we have more granular tokens for different operators
     // OPERATOR,

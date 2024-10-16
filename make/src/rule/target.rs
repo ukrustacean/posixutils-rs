@@ -7,17 +7,19 @@
 // SPDX-License-Identifier: MIT
 //
 
-use core::fmt;
 use crate::special_target::SpecialTarget;
+use core::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 /// A target for a rule.
 pub enum Target {
-    Simple { name: &'static str },
+    Simple {
+        name: &'static str,
+    },
     Inference {
         name: &'static str,
         from: &'static str,
-        to:   &'static str,
+        to: &'static str,
     },
     Special(SpecialTarget),
 }
@@ -57,7 +59,9 @@ impl Target {
 
     fn try_parse_special(name: &str) -> Option<Self> {
         for variant in SpecialTarget::VARIANTS {
-            if variant.as_ref() == name { return Some(Target::Special(variant)); }
+            if variant.as_ref() == name {
+                return Some(Target::Special(variant));
+            }
         }
         None
     }
@@ -88,7 +92,11 @@ impl Target {
             source.next();
         }
 
-        Some(Self::Inference { name: format!(".{from}.{to}").leak(), from: from.leak(), to: to.leak() })
+        Some(Self::Inference {
+            name: format!(".{from}.{to}").leak(),
+            from: from.leak(),
+            to: to.leak(),
+        })
     }
 }
 
