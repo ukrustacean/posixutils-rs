@@ -30,6 +30,7 @@ use std::{
 };
 use std::io::ErrorKind;
 use config::Config;
+use gettextrs::gettext;
 use prerequisite::Prerequisite;
 use recipe::config::Config as RecipeConfig;
 use recipe::Recipe;
@@ -81,17 +82,18 @@ impl Rule {
             touch: global_touch,
             env_macros: global_env_macros,
             quit: global_quit,
+            clear: _,
             print: global_print,
             keep_going: global_keep_going,
             terminate: global_terminate,
             precious: global_precious,
-            ..
+            rules: _,
         } = *global_config;
         let Config {
             ignore: rule_ignore,
             silent: rule_silent,
             precious: rule_precious,
-            ..
+            phony: _,
         } = self.config;
 
         let files = match target {
@@ -145,9 +147,9 @@ impl Rule {
                     // -q flag
                     if quit {
                         if up_to_date {
-                            process::exit(0);
+                            return Ok(());
                         } else {
-                            process::exit(1);
+                            return Err(NotUpToDateError { target: target.to_string() });
                         }
                     }
                 }
@@ -199,7 +201,7 @@ impl Rule {
             // -t flag
             if touch {
                 if !silent {
-                    println!("touch {target}");
+                    println!("{} {target}", gettext("touch"));
                 }
                 let file = File::create(target.as_ref())?;
                 file.set_times(FileTimes::new().set_modified(SystemTime::now()))?;

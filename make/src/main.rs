@@ -10,7 +10,7 @@
 use clap::Parser;
 use const_format::formatcp;
 use core::str::FromStr;
-use gettextrs::{bind_textdomain_codeset, textdomain};
+use gettextrs::{bind_textdomain_codeset, gettext, textdomain};
 use plib::PROJECT_NAME;
 use posixutils_make::{
     config::Config,
@@ -147,8 +147,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         keep_going,
         clear,
         print,
+        precious: false,
         terminate,
-        ..Default::default()
+        rules: Default::default(),
     };
 
     if clear {
@@ -212,7 +213,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         if keep_going {
-            eprintln!("make: Target {} not remade because of errors", target);
+            eprintln!("{}: Target {} not remade because of errors", gettext("make"), target);
             had_error = true;
         }
 
