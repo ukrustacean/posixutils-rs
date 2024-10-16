@@ -146,6 +146,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         quit,
         keep_going,
         clear,
+        print,
         terminate,
         ..Default::default()
     };
@@ -162,7 +163,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // -p flag
             if print {
                 // If makefile is not provided or parsing failed, print the default rules
-                print_rules(&config.rules)?;
+                print_rules(&config.rules);
                 return Ok(());
             } else {
                 eprintln!("make: {}", err);
@@ -179,7 +180,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // -p flag
     if print {
         // Call print for  global config rules
-        print_rules(&make.config.rules)?;
+        print_rules(&make.config.rules);
     }
 
     if targets.is_empty() {
@@ -195,6 +196,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         targets.push(target);
     }
 
+    let mut had_error = false;
     for target in targets {
         let target = target.into_string().unwrap();
         match make.build_target(&target) {
@@ -211,7 +213,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         if keep_going {
             eprintln!("make: Target {} not remade because of errors", target);
-            status_code = 2;
+            had_error = true;
         }
 
         if status_code != 0 {
@@ -219,14 +221,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    if had_error { status_code = 2; }
     process::exit(status_code);
 }
 
 fn print_rules(
     rules: &BTreeMap<String, BTreeSet<String>>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) {
     print!("{:?}", rules);
-    Ok(())
 }
 
 /// Parse the makefile at the given path, or the first default makefile found.

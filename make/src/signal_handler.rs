@@ -10,19 +10,19 @@
 use std::{fs::remove_file, process};
 
 use libc::{signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
-
+use gettextrs::gettext;
 use crate::rule::INTERRUPT_FLAG;
 
 /// Handles incoming signals by setting the interrupt flag and exiting the process.
 pub fn handle_signals(signal_code: libc::c_int) {
     let interrupt_flag = INTERRUPT_FLAG.lock().unwrap();
     if let Some((target, precious)) = interrupt_flag.as_ref() {
-        eprintln!("make: Interrupt");
+        eprintln!("{}", gettext("make: Interrupt"));
         // .PRECIOUS special target
         if !precious {
-            eprintln!("make: Deleting file '{}'", target);
+            eprintln!("{}: {} '{}'", gettext("make"), gettext("Deleting file"), target);
             if let Err(err) = remove_file(target) {
-                eprintln!("Error deleting file: {}", err);
+                eprintln!("{}: {}", gettext("Error deleting file"), err);
             }
         }
     }

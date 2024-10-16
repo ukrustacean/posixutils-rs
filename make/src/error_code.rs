@@ -62,7 +62,7 @@ impl fmt::Display for ErrorCode {
 
         match self {
             NotUpToDateError { target } => {
-                write!(f, "{}: {}", target, gettext("target no up to date"))
+                write!(f, "{}: {}", target, gettext("target is not up to date"))
             }
             ExecutionError { exit_code } => match exit_code {
                 Some(exit_code) => {
