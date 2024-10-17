@@ -275,9 +275,9 @@ rule: dependency
             panic!("Must be preprocessed without an error")
         };
         let parsed = parse(&processed);
-        println!("{:#?}", parsed.syntax());
-        assert_eq!(parsed.errors, Vec::<String>::new());
-        let node = parsed.syntax();
+        println!("{:#?}", parsed.clone().unwrap().syntax());
+        assert_eq!(parsed.clone().err(), None);
+        let node = parsed.clone().unwrap().syntax();
         assert_eq!(
             format!("{:#?}", node),
             r#"ROOT@0..38
@@ -301,7 +301,7 @@ rule: dependency
 "#
         );
 
-        let root = parsed.root().clone_for_update();
+        let root = parsed.unwrap().root().clone_for_update();
 
         let mut rules = root.rules().collect::<Vec<_>>();
         assert_eq!(rules.len(), 1);
@@ -322,8 +322,8 @@ rule: dependency
             panic!("Must be preprocessed without an error")
         };
         let parsed = parse(&processed);
-        assert_eq!(parsed.errors, vec![" *** No targets. Stop."]);
-        let node = parsed.syntax();
+        assert!(parsed.clone().err().is_some());
+        let node = parsed.clone().unwrap().syntax();
         assert_eq!(
             format!("{:#?}", node),
             r#"ROOT@0..0
@@ -331,7 +331,7 @@ rule: dependency
 "#
         );
 
-        let root = parsed.root().clone_for_update();
+        let root = parsed.unwrap().root().clone_for_update();
 
         let mut variables = root.variable_definitions().collect::<Vec<_>>();
         assert_eq!(variables.len(), 0);
@@ -375,8 +375,8 @@ rule: dependency
 
 "#;
         let parsed = parse(MULTIPLE_PREREQUISITES);
-        assert_eq!(parsed.errors, Vec::<String>::new());
-        let node = parsed.syntax();
+        assert_eq!(parsed.clone().err(), None);
+        let node = parsed.clone().unwrap().syntax();
         assert_eq!(
             format!("{:#?}", node),
             r#"ROOT@0..40
@@ -396,7 +396,7 @@ rule: dependency
     NEWLINE@39..40 "\n"
 "#
         );
-        let root = parsed.root().clone_for_update();
+        let root = parsed.unwrap().root().clone_for_update();
 
         let rule = root.rules().next().unwrap();
         assert_eq!(rule.targets().collect::<Vec<_>>(), vec!["rule"]);

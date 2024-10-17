@@ -147,9 +147,9 @@ impl Rule {
                     // -q flag
                     if quit {
                         if up_to_date {
-                            return Ok(());
+                            process::exit(0);
                         } else {
-                            return Err(NotUpToDateError { target: target.to_string() });
+                            process::exit(1);
                         }
                     }
                 }

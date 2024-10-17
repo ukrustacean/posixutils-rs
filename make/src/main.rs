@@ -149,7 +149,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         print,
         precious: false,
         terminate,
-        rules: Default::default(),
+        ..Default::default()
     };
 
     if clear {
