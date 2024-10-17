@@ -97,7 +97,7 @@ impl Parsed {
     pub fn syntax(&self) -> SyntaxNode {
         SyntaxNode::new_root(self.0.clone())
     }
-    
+
     pub fn root(&self) -> Makefile {
         Makefile::cast(self.syntax()).unwrap()
     }
