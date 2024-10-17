@@ -233,7 +233,7 @@ mod arguments {
         run_test_helper(
             &["-kf", "tests/makefiles/arguments/dash_k.mk"],
             "OK\necho 12\n12\n",
-            "make: ExecutionError { exit_code: Some(1) }\nmake: Target z not remade because of errors\n",
+            "make: execution error: 1\nmake: Target z not remade because of errors\n",
             2,
         );
     }
@@ -342,7 +342,7 @@ mod macros {
 mod target_behavior {
     use libc::{kill, SIGINT};
     use std::{thread, time::Duration};
-
+    use posixutils_make::parser::parse::ParseError;
     use super::*;
 
     #[test]
@@ -350,8 +350,8 @@ mod target_behavior {
         run_test_helper(
             &["-f", "tests/makefiles/target_behavior/no_targets.mk"],
             "",
-            "make: no targets to execute\n",
-            ErrorCode::NoTarget { target: None }.into(),
+            "make: parse error:  *** No targets. Stop.\n\n",
+            ErrorCode::ParserError { constraint: ParseError(vec![]) }.into(),
         );
     }
 

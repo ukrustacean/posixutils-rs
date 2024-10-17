@@ -36,7 +36,7 @@ impl From<std::io::Error> for Error {
 impl std::error::Error for Error {}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ParseError(Vec<String>);
+pub struct ParseError(pub Vec<String>);
 
 impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -90,7 +90,20 @@ pub struct Parse {
     pub errors: Vec<String>,
 }
 
-pub fn parse(text: &str) -> Result<GreenNode, ParseError> {
+#[derive(Clone)]
+pub struct Parsed(GreenNode);
+
+impl Parsed {
+    pub fn syntax(&self) -> SyntaxNode {
+        SyntaxNode::new_root(self.0.clone())
+    }
+
+    pub fn root(&self) -> Makefile {
+        Makefile::cast(self.syntax()).unwrap()
+    }
+}
+
+pub fn parse(text: &str) -> Result<Parsed, ParseError> {
     struct Parser {
         /// input tokens, including whitespace,
         /// in *reverse* order.
@@ -274,7 +287,7 @@ pub fn parse(text: &str) -> Result<GreenNode, ParseError> {
     if !result.errors.is_empty() {
         Err(ParseError(result.errors))
     } else {
-        Ok(result.green_node)
+        Ok(Parsed(result.green_node))
     }
 }
 
@@ -383,7 +396,7 @@ impl Makefile {
         r.read_to_string(&mut buf)?;
 
         let parsed = parse(&buf)?;
-        Ok(Makefile::cast(SyntaxNode::new_root(parsed)).unwrap())
+        Ok(parsed.root())
     }
 
     pub fn rules(&self) -> impl Iterator<Item = Rule> {
@@ -518,6 +531,6 @@ impl FromStr for Makefile {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let processed = preprocess(s).map_err(|e| ParseError(vec![e.to_string()]))?;
-        parse(&processed).map(|node| Makefile::cast(SyntaxNode::new_root(node)).unwrap())
+        parse(&processed).map(|node| node.root())
     }
 }
