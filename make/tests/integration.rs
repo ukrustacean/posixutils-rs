@@ -344,7 +344,6 @@ mod target_behavior {
     use libc::{kill, SIGINT};
     use posixutils_make::parser::parse::ParseError;
     use std::{thread, time::Duration};
-    use super::*;
 
     #[test]
     fn no_targets() {
