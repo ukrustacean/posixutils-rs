@@ -654,19 +654,24 @@ mod special_targets {
                 if !file.file_type().map(|x| x.is_file()).unwrap_or(false) {
                     continue;
                 }
-                if file.path().extension().map(|x| x == "txt").unwrap_or(false) {
+                if file
+                    .path()
+                    .extension()
+                    .map(|x| x == "txt2")
+                    .unwrap_or(false)
+                {
                     remove_file(file.path()).unwrap();
                 }
             }
 
-            File::create("copied.txt")
+            File::create("copied.txt2")
                 .unwrap()
                 .write_all(b"some content")
                 .unwrap();
         }
 
         fn remove_files() {
-            remove_file("copied.txt").unwrap();
+            remove_file("copied.txt2").unwrap();
             remove_file("copied.out").unwrap();
         }
     }
