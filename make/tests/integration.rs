@@ -341,7 +341,6 @@ mod macros {
 
 mod target_behavior {
     use super::*;
-    use super::*;
     use libc::{kill, SIGINT};
     use posixutils_make::parser::parse::ParseError;
     use std::{thread, time::Duration};
@@ -546,11 +545,11 @@ mod recipes {
 }
 
 mod special_targets {
+    use std::{fs, thread, time::Duration};
+    use std::fs::remove_dir;
     use super::*;
     use libc::{kill, SIGINT};
     use posixutils_make::special_target;
-    use std::fs::remove_dir;
-    use std::{fs, thread, time::Duration};
 
     #[test]
     fn default() {
