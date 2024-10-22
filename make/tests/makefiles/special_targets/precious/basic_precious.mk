@@ -1,6 +1,6 @@
 .PRECIOUS: 	
 text.txt:
 	echo hello
-	touch some.txt
+	touch preciousdir/some.txt
 	sleep 1
 	echo bye

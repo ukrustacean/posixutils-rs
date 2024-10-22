@@ -625,15 +625,18 @@ mod special_targets {
         let output = child.wait_with_output().expect("failed to wait for child");
 
         let stdout = String::from_utf8_lossy(&output.stdout);
-        assert_eq!(stdout, "echo hello\nhello\ntouch some.txt\nsleep 1\n");
-        assert!(fs::exists("./some.txt").unwrap());
+        assert_eq!(
+            stdout,
+            "echo hello\nhello\ntouch preciousdir/some.txt\nsleep 1\n"
+        );
+        assert!(fs::exists("preciousdir/some.txt").unwrap());
 
         let stderr = String::from_utf8_lossy(&output.stderr);
         assert_eq!(stderr, "make: Interrupt\n");
 
         assert_eq!(output.status.code(), Some(130));
 
-        remove_file("some.txt").unwrap();
+        remove_file("preciousdir/some.txt").unwrap();
     }
 
     #[test]
