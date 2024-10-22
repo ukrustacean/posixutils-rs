@@ -5,5 +5,3 @@
 	@cp copied.txt copied.out
 
 
-copied.out: copied.txt
-
