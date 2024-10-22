@@ -654,12 +654,7 @@ mod special_targets {
                 if !file.file_type().map(|x| x.is_file()).unwrap_or(false) {
                     continue;
                 }
-                if file
-                    .path()
-                    .extension()
-                    .map(|x| x == "txt")
-                    .unwrap_or(false)
-                {
+                if file.path().extension().map(|x| x == "txt").unwrap_or(false) {
                     remove_file(file.path()).unwrap();
                 }
             }
