@@ -627,7 +627,7 @@ mod special_targets {
         let stdout = String::from_utf8_lossy(&output.stdout);
         assert_eq!(stdout, "echo hello\nhello\ntouch some.txt\nsleep 1\n");
         assert!(fs::exists("./some.txt").unwrap());
-        
+
         let stderr = String::from_utf8_lossy(&output.stderr);
         assert_eq!(stderr, "make: Interrupt\n");
 
