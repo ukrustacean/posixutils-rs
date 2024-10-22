@@ -547,7 +547,7 @@ mod recipes {
 
 mod special_targets {
     use std::{fs, thread, time::Duration};
-
+    use std::fs::remove_dir;
     use super::*;
     use libc::{kill, SIGINT};
     use posixutils_make::special_target;
@@ -627,7 +627,7 @@ mod special_targets {
         let stdout = String::from_utf8_lossy(&output.stdout);
         assert_eq!(
             stdout,
-            "echo hello\nhello\ntouch preciousdir/some.txt\nsleep 1\n"
+            "echo hello\nhello\nmkdir preciousdir\ntouch preciousdir/some.txt\nsleep 1\n"
         );
         assert!(fs::exists("preciousdir/some.txt").unwrap());
 
@@ -637,6 +637,7 @@ mod special_targets {
         assert_eq!(output.status.code(), Some(130));
 
         remove_file("preciousdir/some.txt").unwrap();
+        remove_dir("preciousdir").unwrap();
     }
 
     #[test]
