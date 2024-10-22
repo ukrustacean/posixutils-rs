@@ -631,7 +631,7 @@ mod special_targets {
 
         assert_eq!(output.status.code(), Some(130));
 
-        fs::remove_file("some.txt").unwrap();
+        let _ = fs::remove_file("some.txt");
     }
 
     #[test]
