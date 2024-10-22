@@ -341,10 +341,10 @@ mod macros {
 
 mod target_behavior {
     use super::*;
+    use super::*;
     use libc::{kill, SIGINT};
     use posixutils_make::parser::parse::ParseError;
     use std::{thread, time::Duration};
-    use super::*;
 
     #[test]
     fn no_targets() {
@@ -626,13 +626,14 @@ mod special_targets {
 
         let stdout = String::from_utf8_lossy(&output.stdout);
         assert_eq!(stdout, "echo hello\nhello\ntouch some.txt\nsleep 1\n");
+        assert!(fs::exists("./some.txt").unwrap());
 
         let stderr = String::from_utf8_lossy(&output.stderr);
         assert_eq!(stderr, "make: Interrupt\n");
 
         assert_eq!(output.status.code(), Some(130));
 
-        fs::remove_file("some.txt").unwrap();
+        remove_file("some.txt").unwrap();
     }
 
     #[test]
