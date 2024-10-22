@@ -1,5 +1,5 @@
 # General TODO and future implementation notes
-  
+   
 ## Upstream fixes wanted
 
 * libc: missing confstr support on linux
