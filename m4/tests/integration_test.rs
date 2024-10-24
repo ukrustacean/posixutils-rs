@@ -28,7 +28,7 @@ fn read_test(path: impl AsRef<std::path::Path>) -> TestSnapshot {
     snapshot
 }
 
-fn run_command(input: Path) -> std::process::Output {
+fn run_command(input: &Path) -> std::process::Output {
     let input_string = read_to_string(input).unwrap();
     log::info!(
         "Running command with input {input:?}:\n\x1b[34m{}\x1b[0m",
